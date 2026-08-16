@@ -297,6 +297,15 @@ function selecaoHtml(s) {
 
 function multiplaHtml(m, idx) {
   const selecoes = m.selecoes.map(selecaoHtml).join("");
+  const temResultado = m.resultado === "ganhou" || m.resultado === "perdeu";
+  let selo = "";
+  if (m.resultado === "ganhou") {
+    selo = `<span class="ev-badge" style="background:rgba(90,166,110,0.18);color:#7FCB93;">✓ GREEN +R$${(10 * (m.odd_final - 1)).toFixed(2)}</span>`;
+  } else if (m.resultado === "perdeu") {
+    selo = `<span class="ev-badge" style="background:rgba(193,68,60,0.16);color:#E38079;">✕ RED -R$10,00</span>`;
+  } else {
+    selo = `<span class="ev-badge ev-pos">+${(m.ev_final * 100).toFixed(1)}% EV</span>`;
+  }
   return `
     <div class="card-multipla">
       <div class="card-topo">
@@ -304,7 +313,7 @@ function multiplaHtml(m, idx) {
           <span class="card-num">#${idx + 1}</span>
           <span class="card-odd">${m.odd_final.toFixed(2)}</span>
         </div>
-        <span class="ev-badge ev-pos">+${(m.ev_final * 100).toFixed(1)}% EV</span>
+        ${selo}
       </div>
       ${selecoes}
     </div>`;
@@ -330,7 +339,10 @@ async function buscar() {
       }
       cont.innerHTML = `<div class="vazio">Nenhuma múltipla dentro do teto de odd pra essa data.</div>${extra}`;
     } else {
-      const statusLinha = `<div class="status-linha">✓ ${data.total_jogos_analisados || data.selecoes.length} seleção(ões) analisada(s) · ${data.multiplas.length} múltipla(s) encontrada(s)</div>`;
+      const jaTravado = data.de_cache;
+      const statusLinha = jaTravado
+        ? `<div class="status-linha">🔒 Múltiplas de hoje já geradas — travadas até os jogos terminarem</div>`
+        : `<div class="status-linha">✓ ${data.total_jogos_analisados || data.selecoes.length} seleção(ões) analisada(s) · ${data.multiplas.length} múltipla(s) encontrada(s)</div>`;
       cont.innerHTML = statusLinha + data.multiplas.map(multiplaHtml).join("");
     }
   } catch (e) {
@@ -372,11 +384,15 @@ async function marcarResultado(id, resultado, botaoClicado) {
 function itemHistoricoHtml(item) {
   const selecoesTexto = item.selecoes.map(s => `${s.jogo} — ${s.mercado} @${s.odd.toFixed(2)}`).join(" · ");
   const dataFmt = new Date(item.data_jogo + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+  const lucroTexto = item.lucro === null
+    ? `EV +${(item.ev_final * 100).toFixed(1)}%`
+    : (item.lucro >= 0 ? `+R$${item.lucro.toFixed(2)}` : `-R$${Math.abs(item.lucro).toFixed(2)}`);
+  const lucroCor = item.lucro === null ? "var(--text-muted)" : (item.lucro >= 0 ? "#7FCB93" : "#E38079");
   return `
     <div class="item-historico" data-id="${item.id}">
       <div class="item-topo">
         <span class="item-odd">${item.odd_final.toFixed(2)}</span>
-        <span class="item-data">${dataFmt} · EV +${(item.ev_final * 100).toFixed(1)}%</span>
+        <span class="item-data">${dataFmt} · <span style="color:${lucroCor};font-weight:700;">${lucroTexto}</span></span>
       </div>
       <div class="item-selecoes">${selecoesTexto}</div>
       <div class="botoes-resultado">
@@ -403,18 +419,24 @@ async function renderHistorico() {
     let html = "";
 
     if (resumo.semanas && resumo.semanas.length > 0) {
-      html += resumo.semanas.map(s => `
+      html += resumo.semanas.map(s => {
+        const lucroCor = s.lucro >= 0 ? "#7FCB93" : "#E38079";
+        const lucroTexto = s.lucro >= 0 ? `+R$${s.lucro.toFixed(2)}` : `-R$${Math.abs(s.lucro).toFixed(2)}`;
+        return `
         <div class="semana-card">
           <div class="semana-topo">
             <span class="semana-titulo">${mesmaSemanaLabel(s.semana)}</span>
-            ${s.taxa_acerto !== null ? `<span class="taxa-acerto">${s.taxa_acerto}% acerto</span>` : ""}
+            <span style="font-family:'JetBrains Mono',monospace;font-weight:700;color:${lucroCor};">${lucroTexto}</span>
           </div>
           <div class="semana-contadores">
             <span>✓ ${s.ganhou} ganhas</span>
             <span>✕ ${s.perdeu} perdidas</span>
             <span>… ${s.pendente} pendentes</span>
+            ${s.taxa_acerto !== null ? `<span class="taxa-acerto">${s.taxa_acerto}% acerto</span>` : ""}
           </div>
-        </div>`).join("");
+          <div style="font-size:0.72rem;color:var(--text-muted);margin-top:6px;">apostando R$10,00 por múltipla · investido R$${s.investido.toFixed(2)}</div>
+        </div>`;
+      }).join("");
     } else {
       html += `<div class="vazio">Nenhum resumo semanal ainda — busque múltiplas em "Buscar" pra começar a acompanhar.</div>`;
     }
