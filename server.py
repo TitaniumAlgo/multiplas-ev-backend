@@ -85,6 +85,11 @@ def datas_disponiveis():
 
 
 @app.route("/")
+def home():
+    return app.send_static_file("index.html")
+
+
+@app.route("/api/health")
 def health():
     return jsonify({"status": "ok", "servico": "multiplas-ev-backend"})
 
