@@ -1,19 +1,17 @@
 """
 Integração com as APIs reais.
 
-- API-Football  -> estatísticas dos times (médias de gols marcados/sofridos)
-- The Odds API  -> odds comparadas entre casas de apostas
+- API Futebol (api-futebol.com.br) -> jogos do dia e estatísticas dos times
+- The Odds API                     -> odds comparadas entre casas de apostas
 
 O fluxo casa os jogos das duas fontes pelo nome dos times (normalizado) e
 monta a mesma estrutura de "jogo" que o multiplas_ev.py já sabe processar.
 
-IMPORTANTE - CHAVES DE API:
-As chaves NUNCA ficam escritas neste arquivo. Configure como variável
-de ambiente antes de rodar (ou como "Environment Variable" no Render):
+CHAVES DE API: configure como variável de ambiente antes de rodar
+(ou como Environment Variable no Render):
 
-    export API_FOOTBALL_KEY="sua_chave_aqui"
+    export API_FUTEBOL_KEY="sua_chave_aqui"
     export ODDS_API_KEY="sua_chave_aqui"
-    python3 buscar_jogos_reais.py
 """
 
 import os
@@ -29,98 +27,167 @@ from multiplas_ev import gerar_selecoes, montar_multiplas
 # Configuração
 # ---------------------------------------------------------------------
 
-API_FOOTBALL_KEY = os.environ.get("API_FOOTBALL_KEY")
+API_FUTEBOL_KEY = os.environ.get("API_FUTEBOL_KEY")
 ODDS_API_KEY = os.environ.get("ODDS_API_KEY")
 
-if not API_FOOTBALL_KEY or not ODDS_API_KEY:
+if not API_FUTEBOL_KEY or not ODDS_API_KEY:
     raise RuntimeError(
-        "Configure as variáveis de ambiente API_FOOTBALL_KEY e ODDS_API_KEY "
+        "Configure as variáveis de ambiente API_FUTEBOL_KEY e ODDS_API_KEY "
         "antes de rodar (ou como Environment Variables no Render)."
     )
 
-API_FOOTBALL_BASE = "https://v3.football.api-sports.io"
+API_FUTEBOL_BASE = "https://api.api-futebol.com.br/v1"
 ODDS_API_BASE = "https://api.the-odds-api.com/v4"
 
-# Ligas que a API-Football usa (id interno). Ex: 71 = Brasileirão Série A.
-LIGA_ID = 71
-TEMPORADA = 2026
-
-# Esporte/liga equivalente na The Odds API
+CAMPEONATO_ID = 10  # Brasileirão Série A na API Futebol
 ODDS_API_SPORT_KEY = "soccer_brazil_campeonato"
 
+ALIASES = {
+    "atletico mg": "atletico mineiro",
+    "atletico-mg": "atletico mineiro",
+    "atl mineiro": "atletico mineiro",
+    "vasco": "vasco da gama",
+    "inter": "internacional",
+    "bragantino": "red bull bragantino",
+    "rb bragantino": "red bull bragantino",
+}
 
-# ---------------------------------------------------------------------
-# Utilidades
-# ---------------------------------------------------------------------
 
 def normalizar_nome(nome):
-    """Remove acentos, deixa minúsculo e tira sufixos comuns pra comparar nomes de times."""
     nome = unicodedata.normalize("NFKD", nome).encode("ascii", "ignore").decode()
     nome = nome.lower().strip()
-    nome = re.sub(r"\b(fc|ec|sc|ac|esporte clube|futebol clube)\b", "", nome)
+    nome = nome.replace("-", " ")
+    nome = re.sub(r"\b(fc|ec|sc|ac|esporte clube|futebol clube|clube de regatas)\b", "", nome)
     nome = re.sub(r"\s+", " ", nome).strip()
+    nome = ALIASES.get(nome, nome)
     return nome
 
 
-# ---------------------------------------------------------------------
-# API-Football: jogos do dia + estatísticas dos times
-# ---------------------------------------------------------------------
+def mesmo_time(nome_a, nome_b):
+    a, b = normalizar_nome(nome_a), normalizar_nome(nome_b)
+    if a == b:
+        return True
+    if a in b or b in a:
+        return True
+    tokens_a = {t for t in a.split() if len(t) > 2}
+    tokens_b = {t for t in b.split() if len(t) > 2}
+    if not tokens_a or not tokens_b:
+        return False
+    return tokens_a.issubset(tokens_b) or tokens_b.issubset(tokens_a)
 
-def buscar_jogos_do_dia_api_football(data_str=None, debug_info=None):
-    """Retorna a lista de partidas do dia para a liga/temporada configuradas."""
+
+def buscar_jogos_do_dia_api_futebol(data_str=None, debug_info=None):
     if data_str is None:
         data_str = date.today().isoformat()
 
     resp = requests.get(
-        f"{API_FOOTBALL_BASE}/fixtures",
-        headers={"x-apisports-key": API_FOOTBALL_KEY},
-        params={"date": data_str, "league": LIGA_ID, "season": TEMPORADA},
-        timeout=15,
+        f"{API_FUTEBOL_BASE}/campeonatos/{CAMPEONATO_ID}/partidas",
+        headers={"Authorization": f"Bearer {API_FUTEBOL_KEY}"},
+        timeout=20,
     )
     resp.raise_for_status()
     body = resp.json()
+
+    if isinstance(body, dict) and "erro" in body:
+        if debug_info is not None:
+            debug_info["api_futebol_erro"] = body.get("erro")
+        return []
+
+    todas_partidas = _achatar_partidas(body)
+    partidas_do_dia = [
+        p for p in todas_partidas
+        if str(p.get("data_realizacao", "")).startswith(data_str)
+    ]
+
     if debug_info is not None:
-        debug_info["api_football_errors"] = body.get("errors")
-        debug_info["api_football_results_count"] = body.get("results")
-    return body.get("response", [])
+        debug_info["total_partidas_campeonato"] = len(todas_partidas)
+        debug_info["partidas_do_dia_api_futebol"] = len(partidas_do_dia)
+
+    return partidas_do_dia
 
 
-def buscar_estatisticas_time(team_id):
-    """Retorna médias de gols marcados/sofridos do time na temporada."""
+def _achatar_partidas(node, acumulado=None):
+    if acumulado is None:
+        acumulado = []
+    if isinstance(node, list):
+        for item in node:
+            if isinstance(item, dict) and "partida_id" in item:
+                acumulado.append(item)
+            else:
+                _achatar_partidas(item, acumulado)
+    elif isinstance(node, dict):
+        if "partida_id" in node:
+            acumulado.append(node)
+        else:
+            for value in node.values():
+                _achatar_partidas(value, acumulado)
+    return acumulado
+
+
+def buscar_tabela_api_futebol(debug_info=None):
     resp = requests.get(
-        f"{API_FOOTBALL_BASE}/teams/statistics",
-        headers={"x-apisports-key": API_FOOTBALL_KEY},
-        params={"team": team_id, "league": LIGA_ID, "season": TEMPORADA},
-        timeout=15,
+        f"{API_FUTEBOL_BASE}/campeonatos/{CAMPEONATO_ID}/tabela",
+        headers={"Authorization": f"Bearer {API_FUTEBOL_KEY}"},
+        timeout=20,
     )
     resp.raise_for_status()
-    stats = resp.json().get("response", {})
+    body = resp.json()
 
-    try:
-        jogos = stats["fixtures"]["played"]["total"] or 1
-        gols_marcados = stats["goals"]["for"]["total"]["total"] / jogos
-        gols_sofridos = stats["goals"]["against"]["total"]["total"] / jogos
-    except (KeyError, TypeError, ZeroDivisionError):
-        # Fallback conservador se a temporada ainda não tiver dados suficientes
-        gols_marcados, gols_sofridos = 1.3, 1.3
+    entradas = _achatar_tabela(body)
+    tabela = {}
+    for entrada in entradas:
+        time_info = entrada.get("time", {})
+        nome = time_info.get("nome_popular")
+        if not nome:
+            continue
+        tabela[normalizar_nome(nome)] = {
+            "nome_original": nome,
+            "jogos": entrada.get("jogos", 0),
+            "gols_pro": entrada.get("gols_pro", 0),
+            "gols_contra": entrada.get("gols_contra", 0),
+        }
 
-    return gols_marcados, gols_sofridos
+    if debug_info is not None:
+        debug_info["times_na_tabela"] = len(tabela)
+
+    return tabela
 
 
-# ---------------------------------------------------------------------
-# The Odds API: odds comparadas entre casas
-# ---------------------------------------------------------------------
+def _achatar_tabela(node, acumulado=None):
+    if acumulado is None:
+        acumulado = []
+    if isinstance(node, list):
+        for item in node:
+            if isinstance(item, dict) and "time" in item and "gols_pro" in item:
+                acumulado.append(item)
+            else:
+                _achatar_tabela(item, acumulado)
+    elif isinstance(node, dict):
+        if "time" in node and "gols_pro" in node:
+            acumulado.append(node)
+        else:
+            for value in node.values():
+                _achatar_tabela(value, acumulado)
+    return acumulado
+
+
+def buscar_estatisticas_time(nome_time, tabela):
+    chave = normalizar_nome(nome_time)
+    entrada = tabela.get(chave)
+    if entrada is None:
+        entrada = next((v for k, v in tabela.items() if mesmo_time(k, chave)), None)
+
+    if not entrada or not entrada.get("jogos"):
+        return 1.3, 1.3
+
+    jogos = entrada["jogos"]
+    return entrada["gols_pro"] / jogos, entrada["gols_contra"] / jogos
+
 
 def buscar_odds_the_odds_api():
-    """Retorna odds (melhor preço entre casas) para os jogos disponíveis."""
     resp = requests.get(
         f"{ODDS_API_BASE}/sports/{ODDS_API_SPORT_KEY}/odds",
-        params={
-            "apiKey": ODDS_API_KEY,
-            "regions": "eu",
-            "markets": "h2h,totals",
-            "oddsFormat": "decimal",
-        },
+        params={"apiKey": ODDS_API_KEY, "regions": "eu", "markets": "h2h,totals", "oddsFormat": "decimal"},
         timeout=15,
     )
     resp.raise_for_status()
@@ -128,10 +195,6 @@ def buscar_odds_the_odds_api():
 
 
 def melhor_odd_por_mercado(jogo_odds):
-    """
-    Dado um jogo retornado pela The Odds API, varre todas as casas e
-    fica com a MELHOR odd (maior) disponível para cada mercado.
-    """
     melhores = {}
     for casa in jogo_odds.get("bookmakers", []):
         for mercado in casa.get("markets", []):
@@ -151,90 +214,49 @@ def melhor_odd_por_mercado(jogo_odds):
     return melhores
 
 
-# ---------------------------------------------------------------------
-# Junta as duas fontes num único pacote de "jogos" pro multiplas_ev.py
-# ---------------------------------------------------------------------
-
 def montar_jogos_reais(data_str=None, debug_info=None):
-    fixtures = buscar_jogos_do_dia_api_football(data_str, debug_info=debug_info)
+    if data_str is None:
+        data_str = date.today().isoformat()
+
+    partidas = buscar_jogos_do_dia_api_futebol(data_str, debug_info=debug_info)
+    tabela = buscar_tabela_api_futebol(debug_info=debug_info)
     odds_lista = buscar_odds_the_odds_api()
 
     if debug_info is not None:
-        debug_info["fixtures_api_football"] = len(fixtures)
         debug_info["jogos_odds_api"] = len(odds_lista)
-        debug_info["nomes_times_api_football"] = [
-            f"{f['teams']['home']['name']} x {f['teams']['away']['name']}" for f in fixtures[:10]
+        debug_info["nomes_times_odds_api"] = [f"{j['home_team']} x {j['away_team']}" for j in odds_lista[:15]]
+        debug_info["nomes_times_api_futebol"] = [
+            f"{p['time_mandante']['nome_popular']} x {p['time_visitante']['nome_popular']}" for p in partidas[:15]
         ]
-        debug_info["nomes_times_odds_api"] = [
-            f"{j['home_team']} x {j['away_team']}" for j in odds_lista[:10]
-        ]
-
-    # index das odds por par de nomes normalizados
-    odds_por_confronto = {}
-    for jogo_odds in odds_lista:
-        chave = (normalizar_nome(jogo_odds["home_team"]), normalizar_nome(jogo_odds["away_team"]))
-        odds_por_confronto[chave] = melhor_odd_por_mercado(jogo_odds)
 
     jogos = []
-    for fixture in fixtures:
-        time_casa_info = fixture["teams"]["home"]
-        time_fora_info = fixture["teams"]["away"]
+    for partida in partidas:
+        nome_casa = partida["time_mandante"]["nome_popular"]
+        nome_fora = partida["time_visitante"]["nome_popular"]
 
-        chave = (normalizar_nome(time_casa_info["name"]), normalizar_nome(time_fora_info["name"]))
-        odds = odds_por_confronto.get(chave)
-        if not odds:
-            continue  # sem odds pra esse jogo nas duas fontes, pula
+        odds_encontradas = None
+        for jogo_odds in odds_lista:
+            if mesmo_time(nome_casa, jogo_odds["home_team"]) and mesmo_time(nome_fora, jogo_odds["away_team"]):
+                odds_encontradas = melhor_odd_por_mercado(jogo_odds)
+                break
 
-        gm_casa, gs_casa = buscar_estatisticas_time(time_casa_info["id"])
-        gm_fora, gs_fora = buscar_estatisticas_time(time_fora_info["id"])
+        if not odds_encontradas:
+            continue
+
+        gm_casa, gs_casa = buscar_estatisticas_time(nome_casa, tabela)
+        gm_fora, gs_fora = buscar_estatisticas_time(nome_fora, tabela)
 
         jogos.append({
-            "time_casa": {
-                "nome": time_casa_info["name"],
-                "gols_marcados_media": gm_casa,
-                "gols_sofridos_media": gs_casa,
-            },
-            "time_fora": {
-                "nome": time_fora_info["name"],
-                "gols_marcados_media": gm_fora,
-                "gols_sofridos_media": gs_fora,
-            },
-            "odds": odds,
+            "time_casa": {"nome": nome_casa, "gols_marcados_media": gm_casa, "gols_sofridos_media": gs_casa},
+            "time_fora": {"nome": nome_fora, "gols_marcados_media": gm_fora, "gols_sofridos_media": gs_fora},
+            "odds": odds_encontradas,
         })
 
     return jogos
 
 
-# ---------------------------------------------------------------------
-# Execução
-# ---------------------------------------------------------------------
-
 if __name__ == "__main__":
-    print("Buscando jogos e odds reais...")
-    jogos = montar_jogos_reais()
-    print(f"{len(jogos)} jogo(s) casado(s) entre as duas APIs (com odds disponíveis).\n")
-
-    if not jogos:
-        print("Nenhum jogo encontrado pra hoje com odds nas duas fontes. "
-              "Isso é normal fora de dias de rodada, ou se a liga/temporada "
-              "configurada (LIGA_ID / TEMPORADA / ODDS_API_SPORT_KEY) não "
-              "bater com o campeonato que está rolando agora.")
-    else:
-        selecoes = gerar_selecoes(jogos, ev_minimo=0.05)
-        print("=" * 70)
-        print("SELEÇÕES COM EV POSITIVO (>= 5%)")
-        print("=" * 70)
-        for s in selecoes:
-            print(f"{s['jogo']:<28} | {s['mercado']:<10} | odd {s['odd']:.2f} | "
-                  f"prob {s['prob_real']*100:.1f}% | EV {s['ev']*100:+.1f}%")
-
-        print()
-        print("=" * 70)
-        print("TOP 5 MÚLTIPLAS SUGERIDAS")
-        print("=" * 70)
-        multiplas = montar_multiplas(selecoes, min_selecoes=2, max_selecoes=4, odd_final_max=15.0)
-        for m in multiplas[:5]:
-            descricao = " + ".join(f"{s['jogo']} ({s['mercado']} @{s['odd']:.2f})" for s in m["selecoes"])
-            print(f"Odd final: {m['odd_final']:.2f} | EV: {m['ev_final']*100:+.1f}%")
-            print(f"  {descricao}")
-            print()
+    debug_info = {}
+    jogos = montar_jogos_reais(debug_info=debug_info)
+    print("DEBUG:", debug_info)
+    print(f"\n{len(jogos)} jogo(s) casado(s).\n")
