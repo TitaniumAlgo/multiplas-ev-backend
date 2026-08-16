@@ -43,6 +43,55 @@
     align-items: center;
     margin-bottom: 16px;
   }
+  .btn-icone {
+    background: none;
+    border: 1px solid var(--card-border);
+    border-radius: 8px;
+    color: var(--text-muted);
+    padding: 8px 12px;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .btn-icone.ativo { color: var(--gold); border-color: var(--gold); }
+  .semana-card {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 14px;
+    padding: 14px 18px;
+    margin-bottom: 12px;
+  }
+  .semana-topo { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .semana-titulo { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 0.95rem; }
+  .taxa-acerto { font-family: 'JetBrains Mono', monospace; font-weight: 700; color: var(--gold); }
+  .semana-contadores { display: flex; gap: 14px; font-size: 0.78rem; color: var(--text-muted); }
+  .item-historico {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 12px 16px;
+    margin-bottom: 10px;
+  }
+  .item-topo { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .item-odd { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 1.1rem; }
+  .item-data { font-size: 0.74rem; color: var(--text-muted); }
+  .item-selecoes { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 10px; line-height: 1.5; }
+  .botoes-resultado { display: flex; gap: 8px; }
+  .btn-resultado {
+    flex: 1;
+    padding: 8px 0;
+    border-radius: 8px;
+    border: 1px solid var(--card-border);
+    background: transparent;
+    color: var(--text-muted);
+    font-family: 'Inter', sans-serif;
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .btn-resultado.ganhou.ativo { background: rgba(90,166,110,0.18); border-color: #5AA66E; color: #7FCB93; }
+  .btn-resultado.perdeu.ativo { background: rgba(193,68,60,0.16); border-color: var(--danger); color: #E38079; }
   .titulo {
     font-family: 'Oswald', sans-serif;
     font-weight: 700;
@@ -174,6 +223,7 @@
       <div class="titulo">MÚLTIPLAS <span class="accent">EV</span></div>
       <div class="subtitulo">seleções por valor esperado</div>
     </div>
+    <button class="btn-icone" id="btnHistorico">Histórico</button>
   </div>
   <div class="dias" id="dias"></div>
 </div>
@@ -294,6 +344,114 @@ async function buscar() {
 montarDias();
 renderIdle();
 document.getElementById("btnBuscar").addEventListener("click", buscar);
+
+// ---------------- Histórico ----------------
+
+let telaAtual = "buscar"; // "buscar" | "historico"
+
+function mesmaSemanaLabel(semanaIso) {
+  // semanaIso vem como "2026-W33"
+  return semanaIso.replace("-W", " · semana ");
+}
+
+async function marcarResultado(id, resultado, botaoClicado) {
+  const container = botaoClicado.closest(".item-historico");
+  container.querySelectorAll(".btn-resultado").forEach(b => b.classList.remove("ativo"));
+  botaoClicado.classList.add("ativo");
+  try {
+    await fetch(`/api/historico/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ resultado }),
+    });
+  } catch (e) {
+    // silencioso - a UI já refletiu a escolha, tenta de novo na próxima sincronização
+  }
+}
+
+function itemHistoricoHtml(item) {
+  const selecoesTexto = item.selecoes.map(s => `${s.jogo} — ${s.mercado} @${s.odd.toFixed(2)}`).join(" · ");
+  const dataFmt = new Date(item.data_jogo + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+  return `
+    <div class="item-historico" data-id="${item.id}">
+      <div class="item-topo">
+        <span class="item-odd">${item.odd_final.toFixed(2)}</span>
+        <span class="item-data">${dataFmt} · EV +${(item.ev_final * 100).toFixed(1)}%</span>
+      </div>
+      <div class="item-selecoes">${selecoesTexto}</div>
+      <div class="botoes-resultado">
+        <button class="btn-resultado ganhou ${item.resultado === "ganhou" ? "ativo" : ""}" onclick="marcarResultado(${item.id}, 'ganhou', this)">✓ Ganhou</button>
+        <button class="btn-resultado perdeu ${item.resultado === "perdeu" ? "ativo" : ""}" onclick="marcarResultado(${item.id}, 'perdeu', this)">✕ Perdeu</button>
+      </div>
+    </div>`;
+}
+
+async function renderHistorico() {
+  document.getElementById("dias").style.display = "none";
+  document.getElementById("btnBuscar").style.display = "none";
+  const cont = document.getElementById("resultado");
+  cont.innerHTML = `<div class="idle">Carregando histórico...</div>`;
+
+  try {
+    const [respResumo, respItens] = await Promise.all([
+      fetch("/api/historico/resumo-semanal"),
+      fetch("/api/historico"),
+    ]);
+    const resumo = await respResumo.json();
+    const itens = await respItens.json();
+
+    let html = "";
+
+    if (resumo.semanas && resumo.semanas.length > 0) {
+      html += resumo.semanas.map(s => `
+        <div class="semana-card">
+          <div class="semana-topo">
+            <span class="semana-titulo">${mesmaSemanaLabel(s.semana)}</span>
+            ${s.taxa_acerto !== null ? `<span class="taxa-acerto">${s.taxa_acerto}% acerto</span>` : ""}
+          </div>
+          <div class="semana-contadores">
+            <span>✓ ${s.ganhou} ganhas</span>
+            <span>✕ ${s.perdeu} perdidas</span>
+            <span>… ${s.pendente} pendentes</span>
+          </div>
+        </div>`).join("");
+    } else {
+      html += `<div class="vazio">Nenhum resumo semanal ainda — busque múltiplas em "Buscar" pra começar a acompanhar.</div>`;
+    }
+
+    html += `<div style="margin: 20px 0 10px; font-family:'Oswald',sans-serif; font-weight:600; font-size:0.95rem;">Todas as múltiplas salvas</div>`;
+
+    if (itens.itens && itens.itens.length > 0) {
+      html += itens.itens.map(itemHistoricoHtml).join("");
+    } else {
+      html += `<div class="vazio">Nada salvo ainda.</div>`;
+    }
+
+    cont.innerHTML = html;
+  } catch (e) {
+    cont.innerHTML = `<div class="erro-box"><span>⚠️</span><div>Não foi possível carregar o histórico.</div></div>`;
+  }
+}
+
+function renderTelaBuscar() {
+  document.getElementById("dias").style.display = "flex";
+  document.getElementById("btnBuscar").style.display = "flex";
+  renderIdle();
+}
+
+document.getElementById("btnHistorico").addEventListener("click", () => {
+  if (telaAtual === "buscar") {
+    telaAtual = "historico";
+    document.getElementById("btnHistorico").textContent = "Buscar múltiplas";
+    document.getElementById("btnHistorico").classList.add("ativo");
+    renderHistorico();
+  } else {
+    telaAtual = "buscar";
+    document.getElementById("btnHistorico").textContent = "Histórico";
+    document.getElementById("btnHistorico").classList.remove("ativo");
+    renderTelaBuscar();
+  }
+});
 </script>
 </body>
 </html>
