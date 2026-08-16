@@ -1,0 +1,130 @@
+"""
+Histórico de múltiplas (acertos/erros).
+
+Guarda em SQLite, no mesmo servidor. AVISO: no plano gratuito do Render,
+o disco é apagado quando o serviço reinicia (o que acontece de vez em
+quando sozinho, ou a cada novo deploy) — então esse histórico pode
+resetar eventualmente. Se isso incomodar no futuro, dá pra migrar pra um
+banco externo (Supabase, por exemplo) sem mudar o resto do app.
+"""
+
+import hashlib
+import json
+import sqlite3
+from datetime import datetime, date
+
+DB_PATH = "historico.db"
+
+
+def _conectar():
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def iniciar_banco():
+    conn = _conectar()
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS historico (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            data_jogo TEXT NOT NULL,
+            chave TEXT NOT NULL UNIQUE,
+            odd_final REAL NOT NULL,
+            ev_final REAL NOT NULL,
+            selecoes_json TEXT NOT NULL,
+            resultado TEXT NOT NULL DEFAULT 'pendente',
+            criado_em TEXT NOT NULL
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+
+def _chave_da_multipla(data_jogo, multipla):
+    """Gera uma chave única pra não duplicar a mesma múltipla se o app
+    buscar de novo o mesmo dia (ex: usuário toca 'Buscar' várias vezes)."""
+    partes = sorted(f"{s['jogo']}|{s['mercado']}" for s in multipla["selecoes"])
+    bruto = data_jogo + "::" + "::".join(partes)
+    return hashlib.sha256(bruto.encode()).hexdigest()[:16]
+
+
+def salvar_multiplas(data_jogo, multiplas):
+    """Salva cada múltipla gerada como 'pendente', ignorando duplicatas."""
+    conn = _conectar()
+    for m in multiplas:
+        chave = _chave_da_multipla(data_jogo, m)
+        try:
+            conn.execute(
+                "INSERT INTO historico (data_jogo, chave, odd_final, ev_final, selecoes_json, resultado, criado_em) "
+                "VALUES (?, ?, ?, ?, ?, 'pendente', ?)",
+                (data_jogo, chave, m["odd_final"], m["ev_final"], json.dumps(m["selecoes"]), datetime.utcnow().isoformat()),
+            )
+        except sqlite3.IntegrityError:
+            pass  # já salva antes, ignora
+    conn.commit()
+    conn.close()
+
+
+def listar_historico(semana=None):
+    conn = _conectar()
+    if semana:
+        linhas = conn.execute(
+            "SELECT * FROM historico WHERE strftime('%Y-W%W', data_jogo) = ? ORDER BY data_jogo DESC", (semana,)
+        ).fetchall()
+    else:
+        linhas = conn.execute("SELECT * FROM historico ORDER BY data_jogo DESC").fetchall()
+    conn.close()
+    return [
+        {
+            "id": r["id"],
+            "data_jogo": r["data_jogo"],
+            "odd_final": r["odd_final"],
+            "ev_final": r["ev_final"],
+            "selecoes": json.loads(r["selecoes_json"]),
+            "resultado": r["resultado"],
+        }
+        for r in linhas
+    ]
+
+
+def marcar_resultado(item_id, resultado):
+    if resultado not in ("ganhou", "perdeu", "pendente"):
+        raise ValueError("resultado inválido")
+    conn = _conectar()
+    conn.execute("UPDATE historico SET resultado = ? WHERE id = ?", (resultado, item_id))
+    conn.commit()
+    conn.close()
+
+
+def resumo_semanal():
+    """Agrupa por semana ISO (ano-Wsemana) e calcula taxa de acerto."""
+    conn = _conectar()
+    linhas = conn.execute("""
+        SELECT strftime('%Y-W%W', data_jogo) AS semana,
+               resultado,
+               COUNT(*) AS total
+        FROM historico
+        GROUP BY semana, resultado
+        ORDER BY semana DESC
+    """).fetchall()
+    conn.close()
+
+    resumo = {}
+    for r in linhas:
+        semana = r["semana"]
+        resumo.setdefault(semana, {"ganhou": 0, "perdeu": 0, "pendente": 0})
+        resumo[semana][r["resultado"]] = r["total"]
+
+    resultado = []
+    for semana, contagem in resumo.items():
+        decididas = contagem["ganhou"] + contagem["perdeu"]
+        taxa = round(contagem["ganhou"] / decididas * 100, 1) if decididas else None
+        resultado.append({
+            "semana": semana,
+            "ganhou": contagem["ganhou"],
+            "perdeu": contagem["perdeu"],
+            "pendente": contagem["pendente"],
+            "taxa_acerto": taxa,
+        })
+
+    return sorted(resultado, key=lambda x: x["semana"], reverse=True)
