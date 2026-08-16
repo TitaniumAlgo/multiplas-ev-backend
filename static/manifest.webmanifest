@@ -1,0 +1,9 @@
+{
+  "name": "Múltiplas EV",
+  "short_name": "Múltiplas EV",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0E2A1D",
+  "theme_color": "#0E2A1D",
+  "icons": []
+}
