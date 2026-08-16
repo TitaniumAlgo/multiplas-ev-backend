@@ -6,11 +6,24 @@ ou continua pendente (algum jogo ainda não terminou).
 """
 
 import re
+import unicodedata
 
 import requests
 
 import historico
-from buscar_jogos_reais import ODDS_API_BASE, ODDS_API_KEY, ODDS_API_SPORT_KEYS, mesmo_time
+from buscar_jogos_reais import ODDS_API_BASE, ODDS_API_KEY, ODDS_API_SPORT_KEYS
+
+
+def _normalizar_nome(nome):
+    nome = unicodedata.normalize("NFKD", nome).encode("ascii", "ignore").decode()
+    return nome.lower().strip()
+
+
+def mesmo_time(nome_a, nome_b):
+    a, b = _normalizar_nome(nome_a), _normalizar_nome(nome_b)
+    if a == b:
+        return True
+    return a in b or b in a
 
 
 def buscar_resultados_reais(dias_atras=3):
