@@ -40,7 +40,7 @@ def api_multiplas():
       ?max_selecoes=4
     """
     data_str = request.args.get("data", date.today().isoformat())
-    ev_minimo = float(request.args.get("ev_minimo", 0.03))
+    ev_minimo = float(request.args.get("ev_minimo", 0.015))
     odd_max = float(request.args.get("odd_max", 15.0))
     min_sel = int(request.args.get("min_selecoes", 2))
     max_sel = int(request.args.get("max_selecoes", 4))
