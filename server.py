@@ -46,7 +46,8 @@ def api_multiplas():
     max_sel = int(request.args.get("max_selecoes", 4))
 
     try:
-        jogos = montar_jogos_reais(data_str)
+        debug_info = {}
+        jogos = montar_jogos_reais(data_str, debug_info=debug_info)
     except Exception as exc:  # erro de rede/API -> devolve erro legível pro app
         return jsonify({"erro": str(exc)}), 502
 
@@ -59,6 +60,7 @@ def api_multiplas():
     return jsonify({
         "data": data_str,
         "total_jogos_analisados": len(jogos),
+        "debug": debug_info,
         "selecoes": selecoes,
         "multiplas": [
             {
