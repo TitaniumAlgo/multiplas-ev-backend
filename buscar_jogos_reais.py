@@ -8,18 +8,12 @@ O fluxo casa os jogos das duas fontes pelo nome dos times (normalizado) e
 monta a mesma estrutura de "jogo" que o multiplas_ev.py já sabe processar.
 
 IMPORTANTE - CHAVES DE API:
-Não deixe suas chaves escritas direto no código se for compartilhar ou
-subir esse arquivo em algum lugar (ex: GitHub). Configure como variável
-de ambiente antes de rodar:
+As chaves NUNCA ficam escritas neste arquivo. Configure como variável
+de ambiente antes de rodar (ou como "Environment Variable" no Render):
 
     export API_FOOTBALL_KEY="sua_chave_aqui"
     export ODDS_API_KEY="sua_chave_aqui"
     python3 buscar_jogos_reais.py
-
-Se as variáveis não estiverem configuradas, o script usa os valores em
-API_FOOTBALL_KEY_FALLBACK / ODDS_API_KEY_FALLBACK abaixo (só pra você
-testar mais rápido agora - troque para variável de ambiente quando for
-rodar isso num servidor).
 """
 
 import os
@@ -35,11 +29,14 @@ from multiplas_ev import gerar_selecoes, montar_multiplas
 # Configuração
 # ---------------------------------------------------------------------
 
-API_FOOTBALL_KEY_FALLBACK = "70d6d6eca06fb2e8227c24d98372ab1f"
-ODDS_API_KEY_FALLBACK = "60b89b7cea45005a66d9615ce78dd3b1"
+API_FOOTBALL_KEY = os.environ.get("API_FOOTBALL_KEY")
+ODDS_API_KEY = os.environ.get("ODDS_API_KEY")
 
-API_FOOTBALL_KEY = os.environ.get("API_FOOTBALL_KEY", API_FOOTBALL_KEY_FALLBACK)
-ODDS_API_KEY = os.environ.get("ODDS_API_KEY", ODDS_API_KEY_FALLBACK)
+if not API_FOOTBALL_KEY or not ODDS_API_KEY:
+    raise RuntimeError(
+        "Configure as variáveis de ambiente API_FOOTBALL_KEY e ODDS_API_KEY "
+        "antes de rodar (ou como Environment Variables no Render)."
+    )
 
 API_FOOTBALL_BASE = "https://v3.football.api-sports.io"
 ODDS_API_BASE = "https://api.the-odds-api.com/v4"
