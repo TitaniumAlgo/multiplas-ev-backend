@@ -22,7 +22,7 @@ from datetime import date, timedelta
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 
-from multiplas_ev import gerar_selecoes, montar_multiplas
+from multiplas_ev import montar_multiplas
 from buscar_jogos_reais import montar_jogos_reais
 
 app = Flask(__name__)
@@ -34,24 +34,23 @@ def api_multiplas():
     """
     Parâmetros opcionais na URL:
       ?data=2026-08-16   (padrão: hoje)
-      ?ev_minimo=0.05    (padrão: 5%)
+      ?ev_minimo=0.03    (padrão: 3%)
       ?odd_max=15        (teto da odd final da múltipla)
       ?min_selecoes=2
       ?max_selecoes=4
     """
     data_str = request.args.get("data", date.today().isoformat())
-    ev_minimo = float(request.args.get("ev_minimo", 0.05))
+    ev_minimo = float(request.args.get("ev_minimo", 0.03))
     odd_max = float(request.args.get("odd_max", 15.0))
     min_sel = int(request.args.get("min_selecoes", 2))
     max_sel = int(request.args.get("max_selecoes", 4))
 
     debug_info = {}
     try:
-        jogos = montar_jogos_reais(data_str, debug_info=debug_info)
+        selecoes = montar_jogos_reais(data_str, debug_info=debug_info, ev_minimo=ev_minimo)
     except Exception as exc:  # erro de rede/API -> devolve erro legível pro app
         return jsonify({"erro": str(exc), "debug": debug_info}), 502
 
-    selecoes = gerar_selecoes(jogos, ev_minimo=ev_minimo)
     multiplas = montar_multiplas(
         selecoes, min_selecoes=min_sel, max_selecoes=max_sel, odd_final_max=odd_max
     )
@@ -59,7 +58,7 @@ def api_multiplas():
     # formata a resposta em JSON simples pro app consumir
     return jsonify({
         "data": data_str,
-        "total_jogos_analisados": len(jogos),
+        "total_jogos_analisados": debug_info.get("jogos_na_data_pedida", 0),
         "debug": debug_info,
         "selecoes": selecoes,
         "multiplas": [
