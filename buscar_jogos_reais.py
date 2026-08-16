@@ -17,6 +17,7 @@ CHAVE DE API: configure como variável de ambiente antes de rodar
 """
 
 import os
+import re
 from datetime import date
 
 import requests
@@ -126,6 +127,29 @@ def probabilidade_consenso_e_melhor_odd(jogo_odds):
     return resultado
 
 
+def _remover_selecoes_conflitantes(selecoes):
+    """
+    Evita mostrar resultados que se excluem mutuamente do mesmo jogo como se
+    fossem seleções independentes pra combinar (ex: 'Corinthians vencedor',
+    'empate' e 'Cruzeiro vencedor' não podem acontecer juntos - só um é
+    possível). Também evita 'mais de X gols' e 'menos de X gols' da mesma
+    linha aparecerem juntos. Mantém sempre a de maior EV do grupo.
+    """
+    grupos = {}
+    for s in selecoes:
+        mercado = s["mercado"]
+        if mercado.endswith(" vencedor") or mercado == "empate":
+            chave = (s["jogo"], "vencedor_do_jogo")
+        else:
+            m = re.match(r"(?:mais|menos) de ([\d,]+) gols", mercado)
+            chave = (s["jogo"], f"linha_{m.group(1)}") if m else (s["jogo"], mercado)
+
+        if chave not in grupos or s["ev"] > grupos[chave]["ev"]:
+            grupos[chave] = s
+
+    return sorted(grupos.values(), key=lambda s: s["ev"], reverse=True)
+
+
 def gerar_selecoes_consenso(jogos_odds, data_str=None, ev_minimo=0.03):
     selecoes = []
     for jogo_odds in jogos_odds:
@@ -147,6 +171,7 @@ def gerar_selecoes_consenso(jogos_odds, data_str=None, ev_minimo=0.03):
                     "n_casas": dados["n_casas"],
                 })
 
+    selecoes = _remover_selecoes_conflitantes(selecoes)
     return sorted(selecoes, key=lambda s: s["ev"], reverse=True)
 
 
