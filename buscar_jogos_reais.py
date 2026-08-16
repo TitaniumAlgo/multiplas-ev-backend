@@ -66,43 +66,55 @@ def probabilidade_consenso_e_melhor_odd(jogo_odds):
     Para um jogo, percorre todas as casas de apostas e calcula:
     - probabilidade de consenso (média das probabilidades "devigadas" de cada casa)
     - melhor odd individual disponível para cada resultado
-    Retorna um dicionário por mercado: {mercado: {"prob_real": x, "odd": y}}
+    Retorna um dicionário por mercado: {"Santos vencedor": {"prob_real": x, "odd": y}, ...}
+
+    Cobre: vencedor (casa/fora/empate) e todas as linhas de over/under que
+    as casas oferecerem (1.5, 2.5, 3.5, etc - não só uma fixa).
     """
-    probs_por_mercado = {}  # mercado -> lista de probabilidades devigadas (uma por casa)
+    probs_por_mercado = {}  # nome do mercado -> lista de probabilidades devigadas (uma por casa)
     melhor_odd_por_mercado = {}
+
+    nome_casa, nome_fora = jogo_odds["home_team"], jogo_odds["away_team"]
+
+    def registrar(nome_mercado, prob, odd):
+        probs_por_mercado.setdefault(nome_mercado, []).append(prob)
+        if nome_mercado not in melhor_odd_por_mercado or odd > melhor_odd_por_mercado[nome_mercado]:
+            melhor_odd_por_mercado[nome_mercado] = odd
 
     for casa in jogo_odds.get("bookmakers", []):
         for mercado in casa.get("markets", []):
             if mercado["key"] == "h2h":
                 devigadas = _devig_h2h(mercado["outcomes"])
-                nomes = ["casa", "empate", "fora"]
-                # a ordem dos outcomes já vem como home/draw/away na maioria das casas,
-                # mas usamos o nome do time pra mapear com segurança
                 for outcome in mercado["outcomes"]:
-                    if outcome["name"] == jogo_odds["home_team"]:
-                        chave = "casa"
-                    elif outcome["name"] == jogo_odds["away_team"]:
-                        chave = "fora"
+                    if outcome["name"] == nome_casa:
+                        nome_mercado = f"{nome_casa} vencedor"
+                    elif outcome["name"] == nome_fora:
+                        nome_mercado = f"{nome_fora} vencedor"
                     else:
-                        chave = "empate"
-                    prob = devigadas[outcome["name"]]
-                    odd = outcome["price"]
-                    probs_por_mercado.setdefault(chave, []).append(prob)
-                    if chave not in melhor_odd_por_mercado or odd > melhor_odd_por_mercado[chave]:
-                        melhor_odd_por_mercado[chave] = odd
+                        nome_mercado = "empate"
+                    registrar(nome_mercado, devigadas[outcome["name"]], outcome["price"])
 
             elif mercado["key"] == "totals":
-                pontos_25 = [o for o in mercado["outcomes"] if o.get("point") == 2.5]
-                if len(pontos_25) != 2:
-                    continue
-                devigadas = _devig_h2h(pontos_25)
-                for outcome in pontos_25:
-                    chave = "over_2.5" if outcome["name"].lower() == "over" else "under_2.5"
-                    prob = devigadas[outcome["name"]]
-                    odd = outcome["price"]
-                    probs_por_mercado.setdefault(chave, []).append(prob)
-                    if chave not in melhor_odd_por_mercado or odd > melhor_odd_por_mercado[chave]:
-                        melhor_odd_por_mercado[chave] = odd
+                # agrupa os outcomes por linha (1.5, 2.5, 3.5...) - uma casa pode
+                # oferecer mais de uma linha ao mesmo tempo
+                por_linha = {}
+                for outcome in mercado["outcomes"]:
+                    ponto = outcome.get("point")
+                    if ponto is None:
+                        continue
+                    por_linha.setdefault(ponto, []).append(outcome)
+
+                for ponto, outcomes_da_linha in por_linha.items():
+                    if len(outcomes_da_linha) != 2:
+                        continue
+                    devigadas = _devig_h2h(outcomes_da_linha)
+                    linha_fmt = str(ponto).replace(".", ",")
+                    for outcome in outcomes_da_linha:
+                        nome_mercado = (
+                            f"mais de {linha_fmt} gols" if outcome["name"].lower() == "over"
+                            else f"menos de {linha_fmt} gols"
+                        )
+                        registrar(nome_mercado, devigadas[outcome["name"]], outcome["price"])
 
     resultado = {}
     for mercado, probs in probs_por_mercado.items():
