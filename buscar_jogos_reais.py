@@ -151,9 +151,19 @@ def melhor_odd_por_mercado(jogo_odds):
 # Junta as duas fontes num único pacote de "jogos" pro multiplas_ev.py
 # ---------------------------------------------------------------------
 
-def montar_jogos_reais(data_str=None):
+def montar_jogos_reais(data_str=None, debug_info=None):
     fixtures = buscar_jogos_do_dia_api_football(data_str)
     odds_lista = buscar_odds_the_odds_api()
+
+    if debug_info is not None:
+        debug_info["fixtures_api_football"] = len(fixtures)
+        debug_info["jogos_odds_api"] = len(odds_lista)
+        debug_info["nomes_times_api_football"] = [
+            f"{f['teams']['home']['name']} x {f['teams']['away']['name']}" for f in fixtures[:10]
+        ]
+        debug_info["nomes_times_odds_api"] = [
+            f"{j['home_team']} x {j['away_team']}" for j in odds_lista[:10]
+        ]
 
     # index das odds por par de nomes normalizados
     odds_por_confronto = {}
