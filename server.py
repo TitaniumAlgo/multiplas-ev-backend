@@ -24,9 +24,11 @@ from flask_cors import CORS
 
 from multiplas_ev import montar_multiplas
 from buscar_jogos_reais import montar_jogos_reais
+import historico
 
 app = Flask(__name__)
 CORS(app)  # permite o app web (rodando no celular) chamar este servidor
+historico.iniciar_banco()
 
 
 @app.route("/api/multiplas")
@@ -55,25 +57,57 @@ def api_multiplas():
         selecoes, min_selecoes=min_sel, max_selecoes=max_sel, odd_final_max=odd_max
     )
 
+    multiplas_formatadas = [
+        {
+            "odd_final": m["odd_final"],
+            "ev_final": m["ev_final"],
+            "selecoes": [
+                {"jogo": s["jogo"], "mercado": s["mercado"], "odd": s["odd"],
+                 "prob_real": s["prob_real"], "ev": s["ev"]}
+                for s in m["selecoes"]
+            ],
+        }
+        for m in multiplas
+    ]
+
+    # salva automaticamente todas as múltiplas geradas no histórico (pendente)
+    try:
+        historico.salvar_multiplas(data_str, multiplas_formatadas)
+    except Exception:
+        pass  # nunca deixa um problema no histórico quebrar a resposta principal
+
     # formata a resposta em JSON simples pro app consumir
     return jsonify({
         "data": data_str,
         "total_jogos_analisados": debug_info.get("jogos_na_data_pedida", 0),
         "debug": debug_info,
         "selecoes": selecoes,
-        "multiplas": [
-            {
-                "odd_final": m["odd_final"],
-                "ev_final": m["ev_final"],
-                "selecoes": [
-                    {"jogo": s["jogo"], "mercado": s["mercado"], "odd": s["odd"],
-                     "prob_real": s["prob_real"], "ev": s["ev"]}
-                    for s in m["selecoes"]
-                ],
-            }
-            for m in multiplas
-        ],
+        "multiplas": multiplas_formatadas,
     })
+
+
+@app.route("/api/historico")
+def api_historico():
+    """Lista o histórico. Opcional: ?semana=2026-W33 pra filtrar uma semana."""
+    semana = request.args.get("semana")
+    return jsonify({"itens": historico.listar_historico(semana=semana)})
+
+
+@app.route("/api/historico/<int:item_id>", methods=["PATCH"])
+def api_marcar_resultado(item_id):
+    """Body JSON: {"resultado": "ganhou" | "perdeu" | "pendente"}"""
+    body = request.get_json(force=True, silent=True) or {}
+    resultado = body.get("resultado")
+    try:
+        historico.marcar_resultado(item_id, resultado)
+    except ValueError as exc:
+        return jsonify({"erro": str(exc)}), 400
+    return jsonify({"ok": True})
+
+
+@app.route("/api/historico/resumo-semanal")
+def api_resumo_semanal():
+    return jsonify({"semanas": historico.resumo_semanal()})
 
 
 @app.route("/api/datas-disponiveis")
