@@ -65,6 +65,37 @@ def salvar_multiplas(data_jogo, multiplas):
     conn.close()
 
 
+VALOR_APOSTA_SIMULADA = 10.0
+
+
+def _lucro_do_item(odd_final, resultado):
+    if resultado == "ganhou":
+        return round(VALOR_APOSTA_SIMULADA * (odd_final - 1), 2)
+    if resultado == "perdeu":
+        return -VALOR_APOSTA_SIMULADA
+    return None  # pendente - ainda não conta
+
+
+def listar_por_data(data_jogo):
+    conn = _conectar()
+    linhas = conn.execute(
+        "SELECT * FROM historico WHERE data_jogo = ? ORDER BY ev_final DESC", (data_jogo,)
+    ).fetchall()
+    conn.close()
+    return [
+        {
+            "id": r["id"],
+            "data_jogo": r["data_jogo"],
+            "odd_final": r["odd_final"],
+            "ev_final": r["ev_final"],
+            "selecoes": json.loads(r["selecoes_json"]),
+            "resultado": r["resultado"],
+            "lucro": _lucro_do_item(r["odd_final"], r["resultado"]),
+        }
+        for r in linhas
+    ]
+
+
 def listar_historico(semana=None):
     conn = _conectar()
     if semana:
@@ -82,6 +113,7 @@ def listar_historico(semana=None):
             "ev_final": r["ev_final"],
             "selecoes": json.loads(r["selecoes_json"]),
             "resultado": r["resultado"],
+            "lucro": _lucro_do_item(r["odd_final"], r["resultado"]),
         }
         for r in linhas
     ]
@@ -97,23 +129,23 @@ def marcar_resultado(item_id, resultado):
 
 
 def resumo_semanal():
-    """Agrupa por semana ISO (ano-Wsemana) e calcula taxa de acerto."""
+    """Agrupa por semana ISO (ano-Wsemana), calcula taxa de acerto e o
+    lucro/perda simulado (considerando R$10,00 por múltipla)."""
     conn = _conectar()
     linhas = conn.execute("""
-        SELECT strftime('%Y-W%W', data_jogo) AS semana,
-               resultado,
-               COUNT(*) AS total
+        SELECT strftime('%Y-W%W', data_jogo) AS semana, resultado, odd_final
         FROM historico
-        GROUP BY semana, resultado
-        ORDER BY semana DESC
     """).fetchall()
     conn.close()
 
     resumo = {}
     for r in linhas:
         semana = r["semana"]
-        resumo.setdefault(semana, {"ganhou": 0, "perdeu": 0, "pendente": 0})
-        resumo[semana][r["resultado"]] = r["total"]
+        resumo.setdefault(semana, {"ganhou": 0, "perdeu": 0, "pendente": 0, "lucro": 0.0})
+        resumo[semana][r["resultado"]] += 1
+        lucro = _lucro_do_item(r["odd_final"], r["resultado"])
+        if lucro is not None:
+            resumo[semana]["lucro"] += lucro
 
     resultado = []
     for semana, contagem in resumo.items():
@@ -125,6 +157,8 @@ def resumo_semanal():
             "perdeu": contagem["perdeu"],
             "pendente": contagem["pendente"],
             "taxa_acerto": taxa,
+            "lucro": round(contagem["lucro"], 2),
+            "investido": round(decididas * VALOR_APOSTA_SIMULADA, 2),
         })
 
     return sorted(resultado, key=lambda x: x["semana"], reverse=True)
