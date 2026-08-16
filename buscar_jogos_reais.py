@@ -66,7 +66,7 @@ def normalizar_nome(nome):
 # API-Football: jogos do dia + estatísticas dos times
 # ---------------------------------------------------------------------
 
-def buscar_jogos_do_dia_api_football(data_str=None):
+def buscar_jogos_do_dia_api_football(data_str=None, debug_info=None):
     """Retorna a lista de partidas do dia para a liga/temporada configuradas."""
     if data_str is None:
         data_str = date.today().isoformat()
@@ -78,7 +78,11 @@ def buscar_jogos_do_dia_api_football(data_str=None):
         timeout=15,
     )
     resp.raise_for_status()
-    return resp.json().get("response", [])
+    body = resp.json()
+    if debug_info is not None:
+        debug_info["api_football_errors"] = body.get("errors")
+        debug_info["api_football_results_count"] = body.get("results")
+    return body.get("response", [])
 
 
 def buscar_estatisticas_time(team_id):
@@ -152,7 +156,7 @@ def melhor_odd_por_mercado(jogo_odds):
 # ---------------------------------------------------------------------
 
 def montar_jogos_reais(data_str=None, debug_info=None):
-    fixtures = buscar_jogos_do_dia_api_football(data_str)
+    fixtures = buscar_jogos_do_dia_api_football(data_str, debug_info=debug_info)
     odds_lista = buscar_odds_the_odds_api()
 
     if debug_info is not None:
