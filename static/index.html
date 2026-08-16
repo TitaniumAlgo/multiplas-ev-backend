@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Múltiplas EV</title>
+<link rel="manifest" href="/static/manifest.webmanifest">
+<meta name="theme-color" content="#0E2A1D">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0E2A1D;
+    --bg-deep: #0A2016;
+    --card: #153826;
+    --card-border: #24503A;
+    --gold: #D4A537;
+    --gold-soft: #8A7530;
+    --text: #F1EFE4;
+    --text-muted: #9FB5A8;
+    --danger: #C1443C;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', sans-serif;
+    min-height: 100vh;
+    padding-bottom: 40px;
+  }
+  .topo {
+    background: var(--bg-deep);
+    padding: 20px 20px 16px;
+    border-bottom: 1px solid var(--card-border);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  .topo-linha {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+  .titulo {
+    font-family: 'Oswald', sans-serif;
+    font-weight: 700;
+    font-size: 1.3rem;
+    letter-spacing: 0.01em;
+  }
+  .titulo .accent { color: var(--gold); }
+  .subtitulo { font-size: 0.76rem; color: var(--text-muted); }
+  .dias {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+  .dia-pill {
+    flex-shrink: 0;
+    padding: 8px 16px;
+    border-radius: 999px;
+    border: 1px solid var(--card-border);
+    background: transparent;
+    color: var(--text-muted);
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    font-family: 'Inter', sans-serif;
+  }
+  .dia-pill.ativo {
+    border-color: var(--gold);
+    background: rgba(212,165,55,0.14);
+    color: var(--gold);
+  }
+  .corpo { padding: 18px 20px; }
+  .btn-buscar {
+    width: 100%;
+    background: var(--gold);
+    color: var(--bg-deep);
+    border: none;
+    border-radius: 12px;
+    padding: 14px 0;
+    font-family: 'Oswald', sans-serif;
+    font-weight: 600;
+    font-size: 0.95rem;
+    letter-spacing: 0.03em;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    cursor: pointer;
+    margin-bottom: 20px;
+  }
+  .btn-buscar:disabled { opacity: 0.75; cursor: default; }
+  .erro-box {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    background: rgba(193,68,60,0.12);
+    border: 1px solid var(--danger);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 16px;
+    font-size: 0.85rem;
+  }
+  .status-linha {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 14px;
+    color: var(--text-muted);
+    font-size: 0.82rem;
+  }
+  .vazio {
+    text-align: center;
+    color: var(--text-muted);
+    padding: 30px 10px;
+    font-size: 0.88rem;
+  }
+  .idle {
+    text-align: center;
+    color: var(--text-muted);
+    padding: 50px 20px;
+    font-size: 0.9rem;
+    line-height: 1.6;
+  }
+  .card-multipla {
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 14px;
+    padding: 16px 18px;
+    margin-bottom: 14px;
+  }
+  .card-topo {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 10px;
+  }
+  .card-num { color: var(--text-muted); font-size: 0.78rem; font-family: 'JetBrains Mono', monospace; }
+  .card-odd { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 1.7rem; line-height: 1; margin-left: 8px; }
+  .ev-badge {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+    font-size: 0.78rem;
+    padding: 3px 8px;
+    border-radius: 4px;
+  }
+  .ev-pos { background: rgba(212,165,55,0.16); color: var(--gold); }
+  .selecao-linha {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--card-border);
+  }
+  .selecao-linha:last-child { border-bottom: none; }
+  .selecao-nome { font-size: 0.88rem; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .selecao-sub { font-size: 0.76rem; color: var(--text-muted); margin-top: 2px; }
+  .selecao-odd { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 1rem; color: var(--gold); margin-left: 12px; flex-shrink: 0; }
+  .spin { animation: spin 1s linear infinite; display: inline-block; }
+  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+  svg { vertical-align: middle; }
+</style>
+</head>
+<body>
+
+<div class="topo">
+  <div class="topo-linha">
+    <div>
+      <div class="titulo">MÚLTIPLAS <span class="accent">EV</span></div>
+      <div class="subtitulo">seleções por valor esperado</div>
+    </div>
+  </div>
+  <div class="dias" id="dias"></div>
+</div>
+
+<div class="corpo">
+  <button class="btn-buscar" id="btnBuscar">
+    <span id="btnTexto">BUSCAR MÚLTIPLAS</span>
+  </button>
+  <div id="resultado"></div>
+</div>
+
+<script>
+const PALETTE_GOLD = "#D4A537";
+const PALETTE_DANGER = "#C1443C";
+
+let dataEscolhida = new Date().toISOString().slice(0, 10);
+
+function formatarDiaLabel(isoStr, idx) {
+  if (idx === 0) return "Hoje";
+  if (idx === 1) return "Amanhã";
+  const d = new Date(isoStr + "T12:00:00");
+  return d.toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit" }).replace(".", "");
+}
+
+function montarDias() {
+  const cont = document.getElementById("dias");
+  const hoje = new Date();
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(hoje);
+    d.setDate(hoje.getDate() + i);
+    const iso = d.toISOString().slice(0, 10);
+    const btn = document.createElement("button");
+    btn.className = "dia-pill" + (i === 0 ? " ativo" : "");
+    btn.textContent = formatarDiaLabel(iso, i);
+    btn.dataset.data = iso;
+    btn.onclick = () => {
+      document.querySelectorAll(".dia-pill").forEach(p => p.classList.remove("ativo"));
+      btn.classList.add("ativo");
+      dataEscolhida = iso;
+    };
+    cont.appendChild(btn);
+  }
+}
+
+function renderIdle() {
+  document.getElementById("resultado").innerHTML = `
+    <div class="idle">
+      <div style="margin-bottom:10px;">📈</div>
+      <div>Escolha o dia acima e toque em "Buscar múltiplas" pra ver as combinações sugeridas.</div>
+    </div>`;
+}
+
+function renderErro(msg) {
+  document.getElementById("resultado").innerHTML = `
+    <div class="erro-box">
+      <span>⚠️</span>
+      <div>${msg}</div>
+    </div>`;
+}
+
+function selecaoHtml(s) {
+  return `
+    <div class="selecao-linha">
+      <div style="min-width:0;">
+        <div class="selecao-nome">${s.jogo}</div>
+        <div class="selecao-sub">${s.mercado} · prob. real ${(s.prob_real * 100).toFixed(0)}%</div>
+      </div>
+      <div class="selecao-odd">${s.odd.toFixed(2)}</div>
+    </div>`;
+}
+
+function multiplaHtml(m, idx) {
+  const selecoes = m.selecoes.map(selecaoHtml).join("");
+  return `
+    <div class="card-multipla">
+      <div class="card-topo">
+        <div style="display:flex;align-items:baseline;">
+          <span class="card-num">#${idx + 1}</span>
+          <span class="card-odd">${m.odd_final.toFixed(2)}</span>
+        </div>
+        <span class="ev-badge ev-pos">+${(m.ev_final * 100).toFixed(1)}% EV</span>
+      </div>
+      ${selecoes}
+    </div>`;
+}
+
+async function buscar() {
+  const btn = document.getElementById("btnBuscar");
+  const btnTexto = document.getElementById("btnTexto");
+  btn.disabled = true;
+  btnTexto.innerHTML = '<span class="spin">↻</span> BUSCANDO...';
+
+  try {
+    const resp = await fetch(`/api/multiplas?data=${dataEscolhida}`);
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.erro || "Erro ao buscar múltiplas.");
+
+    const cont = document.getElementById("resultado");
+    if (!data.multiplas || data.multiplas.length === 0) {
+      let extra = "";
+      if (data.selecoes && data.selecoes.length > 0) {
+        extra = `<div style="margin-top:16px;"><div class="status-linha">Seleções com EV positivo hoje (sem combinar em múltipla ainda):</div>` +
+          data.selecoes.map(s => `<div class="card-multipla">${selecaoHtml(s)}</div>`).join("") + `</div>`;
+      }
+      cont.innerHTML = `<div class="vazio">Nenhuma múltipla dentro do teto de odd pra essa data.</div>${extra}`;
+    } else {
+      const statusLinha = `<div class="status-linha">✓ ${data.total_jogos_analisados || data.selecoes.length} seleção(ões) analisada(s) · ${data.multiplas.length} múltipla(s) encontrada(s)</div>`;
+      cont.innerHTML = statusLinha + data.multiplas.map(multiplaHtml).join("");
+    }
+  } catch (e) {
+    renderErro(e.message || "Não foi possível conectar ao servidor.");
+  } finally {
+    btn.disabled = false;
+    btnTexto.textContent = "BUSCAR MÚLTIPLAS";
+  }
+}
+
+montarDias();
+renderIdle();
+document.getElementById("btnBuscar").addEventListener("click", buscar);
+</script>
+</body>
+</html>
