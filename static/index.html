@@ -366,39 +366,27 @@ function mesmaSemanaLabel(semanaIso) {
   return semanaIso.replace("-W", " · semana ");
 }
 
-async function marcarResultado(id, resultado, botaoClicado) {
-  const container = botaoClicado.closest(".item-historico");
-  container.querySelectorAll(".btn-resultado").forEach(b => b.classList.remove("ativo"));
-  botaoClicado.classList.add("ativo");
-  try {
-    await fetch(`/api/historico/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ resultado }),
-    });
-  } catch (e) {
-    // silencioso - a UI já refletiu a escolha, tenta de novo na próxima sincronização
-  }
-}
-
 function itemHistoricoHtml(item) {
   const selecoesTexto = item.selecoes.map(s => `${s.jogo} — ${s.mercado} @${s.odd.toFixed(2)}`).join(" · ");
   const dataFmt = new Date(item.data_jogo + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
-  const lucroTexto = item.lucro === null
-    ? `EV +${(item.ev_final * 100).toFixed(1)}%`
-    : (item.lucro >= 0 ? `+R$${item.lucro.toFixed(2)}` : `-R$${Math.abs(item.lucro).toFixed(2)}`);
-  const lucroCor = item.lucro === null ? "var(--text-muted)" : (item.lucro >= 0 ? "#7FCB93" : "#E38079");
+
+  let selo;
+  if (item.resultado === "ganhou") {
+    selo = `<span class="ev-badge" style="background:rgba(90,166,110,0.18);color:#7FCB93;">✓ GREEN +R$${item.lucro.toFixed(2)}</span>`;
+  } else if (item.resultado === "perdeu") {
+    selo = `<span class="ev-badge" style="background:rgba(193,68,60,0.16);color:#E38079;">✕ RED -R$10,00</span>`;
+  } else {
+    selo = `<span class="ev-badge" style="background:rgba(159,181,168,0.14);color:var(--text-muted);">… aguardando jogo terminar</span>`;
+  }
+
   return `
     <div class="item-historico" data-id="${item.id}">
       <div class="item-topo">
         <span class="item-odd">${item.odd_final.toFixed(2)}</span>
-        <span class="item-data">${dataFmt} · <span style="color:${lucroCor};font-weight:700;">${lucroTexto}</span></span>
+        <span class="item-data">${dataFmt}</span>
       </div>
       <div class="item-selecoes">${selecoesTexto}</div>
-      <div class="botoes-resultado">
-        <button class="btn-resultado ganhou ${item.resultado === "ganhou" ? "ativo" : ""}" onclick="marcarResultado(${item.id}, 'ganhou', this)">✓ Ganhou</button>
-        <button class="btn-resultado perdeu ${item.resultado === "perdeu" ? "ativo" : ""}" onclick="marcarResultado(${item.id}, 'perdeu', this)">✕ Perdeu</button>
-      </div>
+      ${selo}
     </div>`;
 }
 
