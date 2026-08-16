@@ -118,10 +118,10 @@ def probabilidade_consenso_e_melhor_odd(jogo_odds):
 
     resultado = {}
     for mercado, probs in probs_por_mercado.items():
-        if len(probs) < 2:
-            continue  # precisa de pelo menos 2 casas pra formar um "consenso" confiável
+        if len(probs) < 4:
+            continue  # precisa de pelo menos 4 casas pra formar um consenso confiável
         prob_media = sum(probs) / len(probs)
-        resultado[mercado] = {"prob_real": prob_media, "odd": melhor_odd_por_mercado[mercado]}
+        resultado[mercado] = {"prob_real": prob_media, "odd": melhor_odd_por_mercado[mercado], "n_casas": len(probs)}
 
     return resultado
 
@@ -144,6 +144,7 @@ def gerar_selecoes_consenso(jogos_odds, data_str=None, ev_minimo=0.03):
                     "odd": dados["odd"],
                     "prob_real": round(dados["prob_real"], 4),
                     "ev": round(ev, 4),
+                    "n_casas": dados["n_casas"],
                 })
 
     return sorted(selecoes, key=lambda s: s["ev"], reverse=True)
