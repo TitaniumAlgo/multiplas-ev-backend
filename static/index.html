@@ -92,6 +92,19 @@
   }
   .btn-resultado.ganhou.ativo { background: rgba(90,166,110,0.18); border-color: #5AA66E; color: #7FCB93; }
   .btn-resultado.perdeu.ativo { background: rgba(193,68,60,0.16); border-color: var(--danger); color: #E38079; }
+  .btn-bet365 {
+    width: 100%;
+    margin-top: 10px;
+    padding: 10px 0;
+    border-radius: 8px;
+    border: 1px solid var(--gold-soft);
+    background: transparent;
+    color: var(--gold);
+    font-family: 'Inter', sans-serif;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
   .titulo {
     font-family: 'Oswald', sans-serif;
     font-weight: 700;
@@ -296,10 +309,22 @@ function selecaoHtml(s) {
     </div>`;
 }
 
+async function abrirNaBet365(jogosTexto, botao) {
+  try {
+    await navigator.clipboard.writeText(jogosTexto);
+    const textoOriginal = botao.textContent;
+    botao.textContent = "✓ Copiado! Abrindo...";
+    setTimeout(() => { botao.textContent = textoOriginal; }, 2000);
+  } catch (e) {
+    // se copiar falhar (ex: permissão negada), ainda assim abre a Bet365
+  }
+  window.open("https://www.bet365.com/", "_blank");
+}
+
 function multiplaHtml(m, idx) {
   const selecoes = m.selecoes.map(selecaoHtml).join("");
-  const temResultado = m.resultado === "ganhou" || m.resultado === "perdeu";
-  let selo = "";
+  const jogosTexto = [...new Set(m.selecoes.map(s => s.jogo))].join(" · ");
+  let selo;
   if (m.resultado === "ganhou") {
     selo = `<span class="ev-badge" style="background:rgba(90,166,110,0.18);color:#7FCB93;">✓ GREEN +R$${(10 * (m.odd_final - 1)).toFixed(2)}</span>`;
   } else if (m.resultado === "perdeu") {
@@ -317,6 +342,7 @@ function multiplaHtml(m, idx) {
         ${selo}
       </div>
       ${selecoes}
+      <button class="btn-bet365" onclick='abrirNaBet365(${JSON.stringify(jogosTexto)}, this)'>Abrir na Bet365 ↗</button>
     </div>`;
 }
 
@@ -370,6 +396,7 @@ function mesmaSemanaLabel(semanaIso) {
 function itemHistoricoHtml(item) {
   const selecoesTexto = item.selecoes.map(s => `${s.jogo} — ${s.mercado} @${s.odd.toFixed(2)}`).join(" · ");
   const dataFmt = new Date(item.data_jogo + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+  const jogosTexto = [...new Set(item.selecoes.map(s => s.jogo))].join(" · ");
 
   let selo;
   if (item.resultado === "ganhou") {
@@ -388,6 +415,7 @@ function itemHistoricoHtml(item) {
       </div>
       <div class="item-selecoes">${selecoesTexto}</div>
       ${selo}
+      ${item.resultado === "pendente" ? `<button class="btn-bet365" onclick='abrirNaBet365(${JSON.stringify(jogosTexto)}, this)'>Abrir na Bet365 ↗</button>` : ""}
     </div>`;
 }
 
