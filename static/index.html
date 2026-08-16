@@ -285,11 +285,12 @@ function renderErro(msg) {
 }
 
 function selecaoHtml(s) {
+  const casasTexto = s.n_casas ? ` · ${s.n_casas} casas` : "";
   return `
     <div class="selecao-linha">
       <div style="min-width:0;">
         <div class="selecao-nome">${s.jogo}</div>
-        <div class="selecao-sub">${s.mercado} · prob. real ${(s.prob_real * 100).toFixed(0)}%</div>
+        <div class="selecao-sub">${s.mercado} · prob. real ${(s.prob_real * 100).toFixed(0)}%${casasTexto}</div>
       </div>
       <div class="selecao-odd">${s.odd.toFixed(2)}</div>
     </div>`;
