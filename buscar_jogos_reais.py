@@ -39,8 +39,41 @@ if not API_FUTEBOL_KEY or not ODDS_API_KEY:
 API_FUTEBOL_BASE = "https://api.api-futebol.com.br/v1"
 ODDS_API_BASE = "https://api.the-odds-api.com/v4"
 
-CAMPEONATO_ID = 10  # Brasileirão Série A na API Futebol
-ODDS_API_SPORT_KEY = "soccer_brazil_campeonato"
+CAMPEONATO_ID = None  # descoberto automaticamente (plano grátis inclui Série B)
+ODDS_API_SPORT_KEYS = ["soccer_brazil_campeonato", "soccer_brazil_serie_b"]
+
+
+def obter_campeonato_id(debug_info=None):
+    """Descobre o campeonato_id certo consultando /v1/campeonatos (evita
+    depender de um número fixo, já que o plano contratado define qual
+    campeonato está liberado)."""
+    global CAMPEONATO_ID
+    if CAMPEONATO_ID is not None:
+        return CAMPEONATO_ID
+
+    resp = requests.get(
+        f"{API_FUTEBOL_BASE}/campeonatos",
+        headers={"Authorization": f"Bearer {API_FUTEBOL_KEY}"},
+        timeout=20,
+    )
+    resp.raise_for_status()
+    campeonatos = resp.json()
+    if debug_info is not None:
+        debug_info["campeonatos_disponiveis"] = [
+            c.get("nome") for c in campeonatos if isinstance(c, dict)
+        ]
+
+    escolhido = None
+    for c in campeonatos:
+        nome = (c.get("nome") or "").lower()
+        if "série b" in nome or "serie b" in nome:
+            escolhido = c.get("campeonato_id")
+            break
+    if escolhido is None and campeonatos:
+        escolhido = campeonatos[0].get("campeonato_id")
+
+    CAMPEONATO_ID = escolhido
+    return CAMPEONATO_ID
 
 ALIASES = {
     "atletico mg": "atletico mineiro",
@@ -80,8 +113,12 @@ def buscar_jogos_do_dia_api_futebol(data_str=None, debug_info=None):
     if data_str is None:
         data_str = date.today().isoformat()
 
+    campeonato_id = obter_campeonato_id(debug_info=debug_info)
+    if campeonato_id is None:
+        return []
+
     resp = requests.get(
-        f"{API_FUTEBOL_BASE}/campeonatos/{CAMPEONATO_ID}/partidas",
+        f"{API_FUTEBOL_BASE}/campeonatos/{campeonato_id}/partidas",
         headers={"Authorization": f"Bearer {API_FUTEBOL_KEY}"},
         timeout=20,
     )
@@ -125,8 +162,12 @@ def _achatar_partidas(node, acumulado=None):
 
 
 def buscar_tabela_api_futebol(debug_info=None):
+    campeonato_id = obter_campeonato_id(debug_info=debug_info)
+    if campeonato_id is None:
+        return {}
+
     resp = requests.get(
-        f"{API_FUTEBOL_BASE}/campeonatos/{CAMPEONATO_ID}/tabela",
+        f"{API_FUTEBOL_BASE}/campeonatos/{campeonato_id}/tabela",
         headers={"Authorization": f"Bearer {API_FUTEBOL_KEY}"},
         timeout=20,
     )
@@ -185,13 +226,16 @@ def buscar_estatisticas_time(nome_time, tabela):
 
 
 def buscar_odds_the_odds_api():
-    resp = requests.get(
-        f"{ODDS_API_BASE}/sports/{ODDS_API_SPORT_KEY}/odds",
-        params={"apiKey": ODDS_API_KEY, "regions": "eu", "markets": "h2h,totals", "oddsFormat": "decimal"},
-        timeout=15,
-    )
-    resp.raise_for_status()
-    return resp.json()
+    todos_jogos = []
+    for sport_key in ODDS_API_SPORT_KEYS:
+        resp = requests.get(
+            f"{ODDS_API_BASE}/sports/{sport_key}/odds",
+            params={"apiKey": ODDS_API_KEY, "regions": "eu", "markets": "h2h,totals", "oddsFormat": "decimal"},
+            timeout=15,
+        )
+        if resp.status_code == 200:
+            todos_jogos.extend(resp.json())
+    return todos_jogos
 
 
 def melhor_odd_por_mercado(jogo_odds):
