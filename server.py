@@ -25,6 +25,7 @@ from flask_cors import CORS
 from multiplas_ev import montar_multiplas
 from buscar_jogos_reais import montar_jogos_reais
 import historico
+import resultados
 
 app = Flask(__name__)
 CORS(app)  # permite o app web (rodando no celular) chamar este servidor
@@ -46,6 +47,25 @@ def api_multiplas():
     odd_max = float(request.args.get("odd_max", 15.0))
     min_sel = int(request.args.get("min_selecoes", 2))
     max_sel = int(request.args.get("max_selecoes", 4))
+    forcar_nova_busca = request.args.get("forcar") == "1"
+
+    # se já tem múltiplas salvas pra essa data, devolve elas (travadas) em vez
+    # de recalcular - assim a seleção não muda depois de gerada, só quando o
+    # jogo terminar e você marcar/for marcado o resultado
+    if not forcar_nova_busca:
+        ja_salvas = historico.listar_por_data(data_str)
+        if ja_salvas:
+            return jsonify({
+                "data": data_str,
+                "de_cache": True,
+                "total_jogos_analisados": None,
+                "debug": {},
+                "selecoes": [],
+                "multiplas": [
+                    {"odd_final": m["odd_final"], "ev_final": m["ev_final"], "selecoes": m["selecoes"], "id": m["id"], "resultado": m["resultado"]}
+                    for m in ja_salvas
+                ],
+            })
 
     debug_info = {}
     try:
@@ -89,6 +109,10 @@ def api_multiplas():
 @app.route("/api/historico")
 def api_historico():
     """Lista o histórico. Opcional: ?semana=2026-W33 pra filtrar uma semana."""
+    try:
+        resultados.atualizar_pendentes()
+    except Exception:
+        pass  # se a checagem de resultados falhar, ainda mostra o histórico salvo
     semana = request.args.get("semana")
     return jsonify({"itens": historico.listar_historico(semana=semana)})
 
