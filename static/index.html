@@ -300,7 +300,7 @@ function renderErro(msg) {
 function selecaoHtml(s) {
   const casasTexto = s.n_casas ? ` · ${s.n_casas} casas` : "";
   return `
-    <div class="selecao-linha">
+    <div class="selecao-linha" style="cursor:pointer;" onclick='abrirNaBet365(${JSON.stringify(s.jogo)}, this)'>
       <div style="min-width:0;">
         <div class="selecao-nome">${s.jogo}</div>
         <div class="selecao-sub">${s.mercado} · prob. real ${(s.prob_real * 100).toFixed(0)}%${casasTexto}</div>
@@ -342,7 +342,6 @@ function multiplaHtml(m, idx) {
         ${selo}
       </div>
       ${selecoes}
-      <button class="btn-bet365" onclick='abrirNaBet365(${JSON.stringify(jogosTexto)}, this)'>Abrir na Bet365 ↗</button>
     </div>`;
 }
 
@@ -415,7 +414,6 @@ function itemHistoricoHtml(item) {
       </div>
       <div class="item-selecoes">${selecoesTexto}</div>
       ${selo}
-      ${item.resultado === "pendente" ? `<button class="btn-bet365" onclick='abrirNaBet365(${JSON.stringify(jogosTexto)}, this)'>Abrir na Bet365 ↗</button>` : ""}
     </div>`;
 }
 
