@@ -175,13 +175,21 @@ def gerar_selecoes_consenso(jogos_odds, data_str=None, ev_minimo=0.03, prob_mini
     return sorted(selecoes, key=lambda s: s["prob_real"], reverse=True)
 
 
-def montar_jogos_reais(data_str=None, debug_info=None, ev_minimo=0.03, prob_minima=0.5):
-    """Mantém o nome usado pelo server.py; retorna direto as seleções + total de jogos."""
+def montar_jogos_reais(data_str=None, debug_info=None, ev_minimo=0.03, prob_minima=0.5, tipo_mercado="todos"):
+    """Mantém o nome usado pelo server.py; retorna direto as seleções + total de jogos.
+
+    tipo_mercado: "todos" | "gols" (só over/under) | "vencedor" (só vencedor/empate)
+    """
     if data_str is None:
         data_str = date.today().isoformat()
 
     jogos_odds = buscar_odds_the_odds_api(debug_info=debug_info)
     selecoes = gerar_selecoes_consenso(jogos_odds, data_str=data_str, ev_minimo=ev_minimo, prob_minima=prob_minima)
+
+    if tipo_mercado == "gols":
+        selecoes = [s for s in selecoes if "gols" in s["mercado"]]
+    elif tipo_mercado == "vencedor":
+        selecoes = [s for s in selecoes if s["mercado"].endswith(" vencedor") or s["mercado"] == "empate"]
 
     if debug_info is not None:
         debug_info["jogos_na_data_pedida"] = len(
