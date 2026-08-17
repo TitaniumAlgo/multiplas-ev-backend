@@ -106,6 +106,10 @@ def buscar_jogos_do_dia(data_str, debug_info=None):
         return []
 
     todas = _achatar(body, lambda item: "partida_id" in item)
+    if debug_info is not None:
+        debug_info["campeonato_id_escolhido"] = campeonato_id
+        debug_info["exemplo_datas"] = sorted({str(p.get("data_realizacao", ""))[:10] for p in todas})[-8:]
+
     do_dia = [p for p in todas if str(p.get("data_realizacao", "")).startswith(data_str)]
     if debug_info is not None:
         debug_info["total_partidas_campeonato"] = len(todas)
