@@ -239,6 +239,7 @@
     <button class="btn-icone" id="btnHistorico">Histórico</button>
   </div>
   <div class="dias" id="dias"></div>
+  <div class="dias" id="tiposMercado" style="margin-top:8px;"></div>
 </div>
 
 <div class="corpo">
@@ -253,6 +254,27 @@ const PALETTE_GOLD = "#D4A537";
 const PALETTE_DANGER = "#C1443C";
 
 let dataEscolhida = new Date().toISOString().slice(0, 10);
+let tipoMercado = "todos";
+
+function montarTiposMercado() {
+  const opcoes = [
+    { valor: "todos", label: "Todos" },
+    { valor: "vencedor", label: "Vencedor" },
+    { valor: "gols", label: "Gols" },
+  ];
+  const cont = document.getElementById("tiposMercado");
+  opcoes.forEach((op, i) => {
+    const btn = document.createElement("button");
+    btn.className = "dia-pill" + (i === 0 ? " ativo" : "");
+    btn.textContent = op.label;
+    btn.onclick = () => {
+      document.querySelectorAll("#tiposMercado .dia-pill").forEach(p => p.classList.remove("ativo"));
+      btn.classList.add("ativo");
+      tipoMercado = op.valor;
+    };
+    cont.appendChild(btn);
+  });
+}
 
 function formatarDiaLabel(isoStr, idx) {
   if (idx === 0) return "Hoje";
@@ -354,7 +376,7 @@ async function buscar() {
   btnTexto.innerHTML = '<span class="spin">↻</span> BUSCANDO...';
 
   try {
-    const resp = await fetch(`/api/multiplas?data=${dataEscolhida}`);
+    const resp = await fetch(`/api/multiplas?data=${dataEscolhida}&tipo_mercado=${tipoMercado}`);
     const data = await resp.json();
     if (!resp.ok) throw new Error(data.erro || "Erro ao buscar múltiplas.");
 
@@ -385,6 +407,7 @@ async function buscar() {
 }
 
 montarDias();
+montarTiposMercado();
 renderIdle();
 document.getElementById("btnBuscar").addEventListener("click", buscar);
 
@@ -424,6 +447,7 @@ function itemHistoricoHtml(item) {
 
 async function renderHistorico() {
   document.getElementById("dias").style.display = "none";
+  document.getElementById("tiposMercado").style.display = "none";
   document.getElementById("btnBuscar").style.display = "none";
   const cont = document.getElementById("resultado");
   cont.innerHTML = `<div class="idle">Carregando histórico...</div>`;
@@ -477,6 +501,7 @@ async function renderHistorico() {
 
 function renderTelaBuscar() {
   document.getElementById("dias").style.display = "flex";
+  document.getElementById("tiposMercado").style.display = "flex";
   document.getElementById("btnBuscar").style.display = "flex";
   renderIdle();
 }
