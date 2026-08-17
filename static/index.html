@@ -237,6 +237,7 @@
       <div class="subtitulo">seleções por valor esperado</div>
     </div>
     <button class="btn-icone" id="btnHistorico">Histórico</button>
+    <button class="btn-icone" id="btnModoProb" style="margin-left:6px;">Série B (sem odds)</button>
   </div>
   <div class="dias" id="dias"></div>
   <div class="dias" id="tiposMercado" style="margin-top:8px;"></div>
@@ -413,7 +414,7 @@ document.getElementById("btnBuscar").addEventListener("click", buscar);
 
 // ---------------- Histórico ----------------
 
-let telaAtual = "buscar"; // "buscar" | "historico"
+let telaAtual = "buscar"; // "buscar" | "historico" | "probabilidade"
 
 function mesmaSemanaLabel(semanaIso) {
   // semanaIso vem como "2026-W33"
@@ -507,7 +508,73 @@ function renderTelaBuscar() {
   renderIdle();
 }
 
+// ---------------- Modo Série B sem odds (só probabilidade) ----------------
+
+function combinacaoProbHtml(c, idx) {
+  const selecoesHtml = c.selecoes.map(s => `
+    <div class="selecao-linha">
+      <div style="min-width:0;">
+        <div class="selecao-nome">${s.jogo}</div>
+        <div class="selecao-sub">${s.mercado}</div>
+      </div>
+      <div class="selecao-odd" style="color:var(--gold);">${(s.prob_real * 100).toFixed(0)}%</div>
+    </div>`).join("");
+  return `
+    <div class="card-multipla">
+      <div class="card-topo">
+        <span class="card-num">#${idx + 1}</span>
+        <span class="ev-badge ev-pos">${(c.prob_final * 100).toFixed(1)}% combinado</span>
+      </div>
+      ${selecoesHtml}
+    </div>`;
+}
+
+async function renderModoProb() {
+  document.getElementById("dias").style.display = "none";
+  document.getElementById("tiposMercado").style.display = "none";
+  document.getElementById("btnBuscar").style.display = "none";
+  const cont = document.getElementById("resultado");
+  cont.innerHTML = `<div class="idle">Buscando na Série B (API Futebol)...</div>`;
+
+  try {
+    const resp = await fetch(`/api/serie-b-probabilidade?data=${dataEscolhida}`);
+    const data = await resp.json();
+    if (!resp.ok) throw new Error(data.erro || "Erro ao buscar.");
+
+    let html = `<div class="erro-box" style="border-color:var(--gold-soft);background:rgba(212,165,55,0.08);">
+      <span>ℹ️</span>
+      <div>Modo sem odds reais — mostra só a probabilidade calculada (Série B). Não representa aposta de valor e não entra no histórico de lucro.</div>
+    </div>`;
+
+    if (data.combinacoes && data.combinacoes.length > 0) {
+      html += data.combinacoes.map(combinacaoProbHtml).join("");
+    } else if (data.selecoes && data.selecoes.length > 0) {
+      html += `<div class="status-linha">Seleções prováveis (sem combinar):</div>`;
+      html += data.selecoes.map((s, i) => combinacaoProbHtml({ selecoes: [s], prob_final: s.prob_real }, i)).join("");
+    } else {
+      html += `<div class="vazio">Nenhum jogo da Série B encontrado pra essa data.</div>`;
+    }
+
+    cont.innerHTML = html;
+  } catch (e) {
+    cont.innerHTML = `<div class="erro-box"><span>⚠️</span><div>${e.message}</div></div>`;
+  }
+}
+
+document.getElementById("btnModoProb").addEventListener("click", () => {
+  document.getElementById("btnHistorico").classList.remove("ativo");
+  document.getElementById("btnModoProb").classList.toggle("ativo");
+  if (telaAtual !== "probabilidade") {
+    telaAtual = "probabilidade";
+    renderModoProb();
+  } else {
+    telaAtual = "buscar";
+    renderTelaBuscar();
+  }
+});
+
 document.getElementById("btnHistorico").addEventListener("click", () => {
+  document.getElementById("btnModoProb").classList.remove("ativo");
   if (telaAtual === "buscar") {
     telaAtual = "historico";
     document.getElementById("btnHistorico").textContent = "Buscar múltiplas";
