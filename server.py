@@ -45,6 +45,7 @@ def api_multiplas():
     data_str = request.args.get("data", date.today().isoformat())
     ev_minimo = float(request.args.get("ev_minimo", 0.04))
     prob_minima = float(request.args.get("prob_minima", 0.5))
+    tipo_mercado = request.args.get("tipo_mercado", "todos")
     odd_max = float(request.args.get("odd_max", 15.0))
     min_sel = int(request.args.get("min_selecoes", 2))
     max_sel = int(request.args.get("max_selecoes", 3))
@@ -77,7 +78,7 @@ def api_multiplas():
 
     debug_info = {}
     try:
-        selecoes = montar_jogos_reais(data_str, debug_info=debug_info, ev_minimo=ev_minimo, prob_minima=prob_minima)
+        selecoes = montar_jogos_reais(data_str, debug_info=debug_info, ev_minimo=ev_minimo, prob_minima=prob_minima, tipo_mercado=tipo_mercado)
     except Exception as exc:  # erro de rede/API -> devolve erro legível pro app
         return jsonify({"erro": str(exc), "debug": debug_info}), 502
 
