@@ -55,7 +55,7 @@ def api_multiplas():
     # de recalcular - assim a seleção não muda depois de gerada, só quando o
     # jogo terminar e você marcar/for marcado o resultado
     if not forcar_nova_busca:
-        ja_salvas = historico.listar_por_data(data_str)
+        ja_salvas = historico.listar_por_data(data_str, tipo_mercado=tipo_mercado)
         if ja_salvas:
             def _prob_combinada(m):
                 p = 1.0
@@ -102,7 +102,7 @@ def api_multiplas():
 
     # salva automaticamente todas as múltiplas geradas no histórico (pendente)
     try:
-        historico.salvar_multiplas(data_str, multiplas_formatadas)
+        historico.salvar_multiplas(data_str, multiplas_formatadas, tipo_mercado=tipo_mercado)
     except Exception:
         pass  # nunca deixa um problema no histórico quebrar a resposta principal
 
