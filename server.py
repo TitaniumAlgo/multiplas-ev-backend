@@ -55,6 +55,12 @@ def api_multiplas():
     if not forcar_nova_busca:
         ja_salvas = historico.listar_por_data(data_str)
         if ja_salvas:
+            def _prob_combinada(m):
+                p = 1.0
+                for s in m["selecoes"]:
+                    p *= s["prob_real"]
+                return round(p, 4)
+
             return jsonify({
                 "data": data_str,
                 "de_cache": True,
@@ -62,7 +68,8 @@ def api_multiplas():
                 "debug": {},
                 "selecoes": [],
                 "multiplas": [
-                    {"odd_final": m["odd_final"], "ev_final": m["ev_final"], "selecoes": m["selecoes"], "id": m["id"], "resultado": m["resultado"]}
+                    {"odd_final": m["odd_final"], "ev_final": m["ev_final"], "prob_final": _prob_combinada(m),
+                     "selecoes": m["selecoes"], "id": m["id"], "resultado": m["resultado"]}
                     for m in ja_salvas
                 ],
             })
@@ -81,6 +88,7 @@ def api_multiplas():
         {
             "odd_final": m["odd_final"],
             "ev_final": m["ev_final"],
+            "prob_final": m["prob_final"],
             "selecoes": [
                 {"jogo": s["jogo"], "mercado": s["mercado"], "odd": s["odd"],
                  "prob_real": s["prob_real"], "ev": s["ev"]}
