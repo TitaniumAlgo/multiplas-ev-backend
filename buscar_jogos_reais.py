@@ -150,7 +150,7 @@ def _remover_selecoes_conflitantes(selecoes):
     return sorted(grupos.values(), key=lambda s: s["ev"], reverse=True)
 
 
-def gerar_selecoes_consenso(jogos_odds, data_str=None, ev_minimo=0.03):
+def gerar_selecoes_consenso(jogos_odds, data_str=None, ev_minimo=0.03, prob_minima=0.5):
     selecoes = []
     for jogo_odds in jogos_odds:
         if data_str and not str(jogo_odds.get("commence_time", "")).startswith(data_str):
@@ -161,7 +161,7 @@ def gerar_selecoes_consenso(jogos_odds, data_str=None, ev_minimo=0.03):
 
         for mercado, dados in mercados.items():
             ev = calcular_ev(dados["prob_real"], dados["odd"])
-            if ev >= ev_minimo:
+            if ev >= ev_minimo and dados["prob_real"] >= prob_minima:
                 selecoes.append({
                     "jogo": nome_jogo,
                     "mercado": mercado,
@@ -175,13 +175,13 @@ def gerar_selecoes_consenso(jogos_odds, data_str=None, ev_minimo=0.03):
     return sorted(selecoes, key=lambda s: s["prob_real"], reverse=True)
 
 
-def montar_jogos_reais(data_str=None, debug_info=None, ev_minimo=0.03):
+def montar_jogos_reais(data_str=None, debug_info=None, ev_minimo=0.03, prob_minima=0.5):
     """Mantém o nome usado pelo server.py; retorna direto as seleções + total de jogos."""
     if data_str is None:
         data_str = date.today().isoformat()
 
     jogos_odds = buscar_odds_the_odds_api(debug_info=debug_info)
-    selecoes = gerar_selecoes_consenso(jogos_odds, data_str=data_str, ev_minimo=ev_minimo)
+    selecoes = gerar_selecoes_consenso(jogos_odds, data_str=data_str, ev_minimo=ev_minimo, prob_minima=prob_minima)
 
     if debug_info is not None:
         debug_info["jogos_na_data_pedida"] = len(
