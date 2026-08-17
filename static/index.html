@@ -424,6 +424,7 @@ function itemHistoricoHtml(item) {
   const selecoesTexto = item.selecoes.map(s => `${s.jogo} — ${s.mercado} @${s.odd.toFixed(2)}`).join(" · ");
   const dataFmt = new Date(item.data_jogo + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
   const jogosTexto = [...new Set(item.selecoes.map(s => s.jogo))].join(" · ");
+  const tipoLabel = { todos: "Todos", vencedor: "Vencedor", gols: "Gols" }[item.tipo_mercado] || item.tipo_mercado || "Todos";
 
   let selo;
   if (item.resultado === "ganhou") {
@@ -438,7 +439,7 @@ function itemHistoricoHtml(item) {
     <div class="item-historico" data-id="${item.id}">
       <div class="item-topo">
         <span class="item-odd">${item.odd_final.toFixed(2)}</span>
-        <span class="item-data">${dataFmt}</span>
+        <span class="item-data">${dataFmt} · ${tipoLabel}</span>
       </div>
       <div class="item-selecoes">${selecoesTexto}</div>
       ${selo}
