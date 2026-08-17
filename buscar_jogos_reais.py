@@ -38,7 +38,7 @@ def buscar_odds_the_odds_api(debug_info=None):
     for sport_key in ODDS_API_SPORT_KEYS:
         resp = requests.get(
             f"{ODDS_API_BASE}/sports/{sport_key}/odds",
-            params={"apiKey": ODDS_API_KEY, "regions": "eu,uk,us", "markets": "h2h,totals", "oddsFormat": "decimal"},
+            params={"apiKey": ODDS_API_KEY, "regions": "eu", "markets": "h2h,totals", "oddsFormat": "decimal"},
             timeout=15,
         )
         if resp.status_code == 200:
