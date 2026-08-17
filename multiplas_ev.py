@@ -171,7 +171,7 @@ def montar_multiplas(selecoes, min_selecoes=2, max_selecoes=4,
                 "ev_final": round(ev_final, 4),
             })
 
-    return sorted(multiplas, key=lambda m: m["ev_final"], reverse=True)
+    return sorted(multiplas, key=lambda m: m["prob_final"], reverse=True)
 
 
 # ---------------------------------------------------------------------
