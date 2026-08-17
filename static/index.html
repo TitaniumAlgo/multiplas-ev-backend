@@ -272,6 +272,9 @@ function montarTiposMercado() {
       document.querySelectorAll("#tiposMercado .dia-pill").forEach(p => p.classList.remove("ativo"));
       btn.classList.add("ativo");
       tipoMercado = op.valor;
+      if (telaAtual === "probabilidade") {
+        renderModoProb();
+      }
     };
     cont.appendChild(btn);
   });
@@ -534,23 +537,24 @@ function combinacaoProbHtml(c, idx) {
 
 async function renderModoProb() {
   document.getElementById("dias").style.display = "flex";
-  document.getElementById("tiposMercado").style.display = "none";
+  document.getElementById("tiposMercado").style.display = "flex";
   document.getElementById("btnBuscar").style.display = "none";
   const cont = document.getElementById("resultado");
   cont.innerHTML = `<div class="idle">Buscando na Série B (API Futebol)...</div>`;
 
   try {
-    const resp = await fetch(`/api/serie-b-probabilidade?data=${dataEscolhida}`);
+    const resp = await fetch(`/api/serie-b-probabilidade?data=${dataEscolhida}&tipo_mercado=${tipoMercado}`);
     const data = await resp.json();
     if (!resp.ok) throw new Error(data.erro || "Erro ao buscar.");
 
     let html = `<div class="erro-box" style="border-color:var(--gold-soft);background:rgba(212,165,55,0.08);">
       <span>ℹ️</span>
-      <div>Modo sem odds reais — mostra só a probabilidade calculada (Série B). Não representa aposta de valor e não entra no histórico de lucro.</div>
-    </div>`;
+      <div>Modo sem odds reais — mostra só a probabilidade calculada (Série B). Não representa aposta de valor.</div>
+    </div>
+    <button class="btn-icone" id="btnHistoricoProb" style="margin-bottom:14px;">Ver histórico de acerto/erro</button>`;
 
     if (data.combinacoes && data.combinacoes.length > 0) {
-      html += data.combinacoes.map(combinacaoProbHtml).join("");
+      html += data.combinacoes.map((c, i) => combinacaoProbHtml(c, i)).join("");
     } else if (data.selecoes && data.selecoes.length > 0) {
       html += `<div class="status-linha">Seleções prováveis (sem combinar):</div>`;
       html += data.selecoes.map((s, i) => combinacaoProbHtml({ selecoes: [s], prob_final: s.prob_real }, i)).join("");
@@ -559,8 +563,69 @@ async function renderModoProb() {
     }
 
     cont.innerHTML = html;
+    document.getElementById("btnHistoricoProb").addEventListener("click", renderHistoricoProb);
   } catch (e) {
     cont.innerHTML = `<div class="erro-box"><span>⚠️</span><div>${e.message}</div></div>`;
+  }
+}
+
+function itemHistoricoProbHtml(item) {
+  const selecoesTexto = item.selecoes.map(s => `${s.jogo} — ${s.mercado}`).join(" · ");
+  const dataFmt = new Date(item.data_jogo + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+  let selo;
+  if (item.resultado === "ganhou") {
+    selo = `<span class="ev-badge" style="background:rgba(90,166,110,0.18);color:#7FCB93;">✓ ACERTOU</span>`;
+  } else if (item.resultado === "perdeu") {
+    selo = `<span class="ev-badge" style="background:rgba(193,68,60,0.16);color:#E38079;">✕ ERROU</span>`;
+  } else {
+    selo = `<span class="ev-badge" style="background:rgba(159,181,168,0.14);color:var(--text-muted);">… aguardando jogo terminar</span>`;
+  }
+  return `
+    <div class="item-historico">
+      <div class="item-topo">
+        <span class="item-odd">${(item.prob_final * 100).toFixed(0)}%</span>
+        <span class="item-data">${dataFmt}</span>
+      </div>
+      <div class="item-selecoes">${selecoesTexto}</div>
+      ${selo}
+    </div>`;
+}
+
+async function renderHistoricoProb() {
+  const cont = document.getElementById("resultado");
+  cont.innerHTML = `<div class="idle">Carregando histórico...</div>`;
+  try {
+    const resp = await fetch("/api/historico-prob");
+    const data = await resp.json();
+
+    let html = `<button class="btn-icone" id="btnVoltarProb" style="margin-bottom:14px;">← Voltar</button>`;
+
+    if (data.semanas && data.semanas.length > 0) {
+      html += data.semanas.map(s => `
+        <div class="semana-card">
+          <div class="semana-topo">
+            <span class="semana-titulo">${mesmaSemanaLabel(s.semana)}</span>
+            ${s.taxa_acerto !== null ? `<span class="taxa-acerto">${s.taxa_acerto}% acerto</span>` : ""}
+          </div>
+          <div class="semana-contadores">
+            <span>✓ ${s.ganhou} acertos</span>
+            <span>✕ ${s.perdeu} erros</span>
+            <span>… ${s.pendente} pendentes</span>
+          </div>
+        </div>`).join("");
+    } else {
+      html += `<div class="vazio">Nenhum resumo ainda.</div>`;
+    }
+
+    html += `<div style="margin:20px 0 10px; font-family:'Oswald',sans-serif; font-weight:600; font-size:0.95rem;">Todas as combinações</div>`;
+    html += data.itens && data.itens.length > 0
+      ? data.itens.map(itemHistoricoProbHtml).join("")
+      : `<div class="vazio">Nada salvo ainda.</div>`;
+
+    cont.innerHTML = html;
+    document.getElementById("btnVoltarProb").addEventListener("click", renderModoProb);
+  } catch (e) {
+    cont.innerHTML = `<div class="erro-box"><span>⚠️</span><div>Não foi possível carregar.</div></div>`;
   }
 }
 
