@@ -324,13 +324,14 @@ async function abrirNaBet365(jogosTexto, botao) {
 function multiplaHtml(m, idx) {
   const selecoes = m.selecoes.map(selecaoHtml).join("");
   const jogosTexto = [...new Set(m.selecoes.map(s => s.jogo))].join(" · ");
+  const probPct = (m.prob_final * 100).toFixed(0);
   let selo;
   if (m.resultado === "ganhou") {
     selo = `<span class="ev-badge" style="background:rgba(90,166,110,0.18);color:#7FCB93;">✓ GREEN +R$${(10 * (m.odd_final - 1)).toFixed(2)}</span>`;
   } else if (m.resultado === "perdeu") {
     selo = `<span class="ev-badge" style="background:rgba(193,68,60,0.16);color:#E38079;">✕ RED -R$10,00</span>`;
   } else {
-    selo = `<span class="ev-badge ev-pos">+${(m.ev_final * 100).toFixed(1)}% EV</span>`;
+    selo = `<span class="ev-badge ev-pos">${probPct}% chance</span>`;
   }
   return `
     <div class="card-multipla">
@@ -342,6 +343,7 @@ function multiplaHtml(m, idx) {
         ${selo}
       </div>
       ${selecoes}
+      <div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;">EV +${(m.ev_final * 100).toFixed(1)}% · probabilidade combinada ${probPct}%</div>
     </div>`;
 }
 
