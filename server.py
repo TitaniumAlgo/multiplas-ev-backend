@@ -27,10 +27,13 @@ from buscar_jogos_reais import montar_jogos_reais
 import historico
 import resultados
 import serie_b_probabilidade
+import historico_prob
+import resultados_prob
 
 app = Flask(__name__)
 CORS(app)  # permite o app web (rodando no celular) chamar este servidor
 historico.iniciar_banco()
+historico_prob.iniciar_banco()
 
 
 @app.route("/api/multiplas")
@@ -129,8 +132,25 @@ def api_serie_b_probabilidade():
 
     data_str = request.args.get("data", date.today().isoformat())
     prob_minima = float(request.args.get("prob_minima", 0.5))
+    tipo_mercado = request.args.get("tipo_mercado", "todos")
     min_sel = int(request.args.get("min_selecoes", 2))
     max_sel = int(request.args.get("max_selecoes", 3))
+    forcar_nova_busca = request.args.get("forcar") == "1"
+
+    if not forcar_nova_busca:
+        ja_salvas = historico_prob.listar_por_data(data_str, tipo_mercado=tipo_mercado)
+        if ja_salvas:
+            return jsonify({
+                "data": data_str,
+                "de_cache": True,
+                "aviso": "Modo só-probabilidade (Série B, sem odds reais - não representa aposta de valor)",
+                "debug": {},
+                "selecoes": [],
+                "combinacoes": [
+                    {"prob_final": m["prob_final"], "selecoes": m["selecoes"], "id": m["id"], "resultado": m["resultado"]}
+                    for m in ja_salvas
+                ],
+            })
 
     debug_info = {}
     try:
@@ -140,7 +160,17 @@ def api_serie_b_probabilidade():
     except Exception as exc:
         return jsonify({"erro": str(exc), "debug": debug_info}), 502
 
+    if tipo_mercado == "gols":
+        selecoes = [s for s in selecoes if "gols" in s["mercado"]]
+    elif tipo_mercado == "vencedor":
+        selecoes = [s for s in selecoes if s["mercado"].endswith(" vencedor") or s["mercado"] == "empate"]
+
     combinacoes = serie_b_probabilidade.montar_combinacoes(selecoes, min_sel, max_sel)
+
+    try:
+        historico_prob.salvar_combinacoes(data_str, combinacoes, tipo_mercado=tipo_mercado)
+    except Exception:
+        pass
 
     return jsonify({
         "data": data_str,
@@ -148,6 +178,18 @@ def api_serie_b_probabilidade():
         "debug": debug_info,
         "selecoes": selecoes,
         "combinacoes": combinacoes,
+    })
+
+
+@app.route("/api/historico-prob")
+def api_historico_prob():
+    try:
+        resultados_prob.atualizar_pendentes()
+    except Exception:
+        pass
+    return jsonify({
+        "itens": historico_prob.listar_historico(),
+        "semanas": historico_prob.resumo_semanal(),
     })
 def api_historico():
     """Lista o histórico. Opcional: ?semana=2026-W33 pra filtrar uma semana."""
