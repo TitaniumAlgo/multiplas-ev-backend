@@ -365,7 +365,10 @@ async function buscar() {
         extra = `<div style="margin-top:16px;"><div class="status-linha">Seleções com EV positivo hoje (sem combinar em múltipla ainda):</div>` +
           data.selecoes.map(s => `<div class="card-multipla">${selecaoHtml(s)}</div>`).join("") + `</div>`;
       }
-      cont.innerHTML = `<div class="vazio">Nenhuma múltipla dentro do teto de odd pra essa data.</div>${extra}`;
+      const msgVazia = data.selecoes && data.selecoes.length > 0
+        ? "Nenhuma múltipla dentro do teto de odd pra essa data."
+        : "Nenhuma seleção segura (50%+ de chance e com vantagem real) encontrada hoje. Isso é esperado em dias fracos — melhor não forçar aposta do que arriscar numa zebra.";
+      cont.innerHTML = `<div class="vazio">${msgVazia}</div>${extra}`;
     } else {
       const jaTravado = data.de_cache;
       const statusLinha = jaTravado
