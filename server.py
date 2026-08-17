@@ -26,6 +26,7 @@ from multiplas_ev import montar_multiplas
 from buscar_jogos_reais import montar_jogos_reais
 import historico
 import resultados
+import serie_b_probabilidade
 
 app = Flask(__name__)
 CORS(app)  # permite o app web (rodando no celular) chamar este servidor
@@ -116,7 +117,38 @@ def api_multiplas():
     })
 
 
-@app.route("/api/historico")
+@app.route("/api/serie-b-probabilidade")
+def api_serie_b_probabilidade():
+    """
+    Modo alternativo (sem odds, só probabilidade real via Poisson) pra usar
+    quando os créditos da The Odds API acabarem. Cobre só a Série B, que é
+    o campeonato liberado no plano gratuito da API Futebol.
+    """
+    if not serie_b_probabilidade.disponivel():
+        return jsonify({"erro": "API_FUTEBOL_KEY não configurada no servidor."}), 502
+
+    data_str = request.args.get("data", date.today().isoformat())
+    prob_minima = float(request.args.get("prob_minima", 0.5))
+    min_sel = int(request.args.get("min_selecoes", 2))
+    max_sel = int(request.args.get("max_selecoes", 3))
+
+    debug_info = {}
+    try:
+        selecoes = serie_b_probabilidade.gerar_selecoes_probabilidade(
+            data_str, prob_minima=prob_minima, debug_info=debug_info
+        )
+    except Exception as exc:
+        return jsonify({"erro": str(exc), "debug": debug_info}), 502
+
+    combinacoes = serie_b_probabilidade.montar_combinacoes(selecoes, min_sel, max_sel)
+
+    return jsonify({
+        "data": data_str,
+        "aviso": "Modo só-probabilidade (Série B, sem odds reais - não representa aposta de valor)",
+        "debug": debug_info,
+        "selecoes": selecoes,
+        "combinacoes": combinacoes,
+    })
 def api_historico():
     """Lista o histórico. Opcional: ?semana=2026-W33 pra filtrar uma semana."""
     try:
