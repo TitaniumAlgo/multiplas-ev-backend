@@ -172,7 +172,7 @@ def gerar_selecoes_consenso(jogos_odds, data_str=None, ev_minimo=0.03):
                 })
 
     selecoes = _remover_selecoes_conflitantes(selecoes)
-    return sorted(selecoes, key=lambda s: s["ev"], reverse=True)
+    return sorted(selecoes, key=lambda s: s["prob_real"], reverse=True)
 
 
 def montar_jogos_reais(data_str=None, debug_info=None, ev_minimo=0.03):
