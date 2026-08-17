@@ -36,28 +36,32 @@ def iniciar_banco():
             criado_em TEXT NOT NULL
         )
     """)
+    try:
+        conn.execute("ALTER TABLE historico ADD COLUMN tipo_mercado TEXT NOT NULL DEFAULT 'todos'")
+    except sqlite3.OperationalError:
+        pass  # coluna já existe (banco criado numa versão anterior)
     conn.commit()
     conn.close()
 
 
-def _chave_da_multipla(data_jogo, multipla):
+def _chave_da_multipla(data_jogo, multipla, tipo_mercado):
     """Gera uma chave única pra não duplicar a mesma múltipla se o app
     buscar de novo o mesmo dia (ex: usuário toca 'Buscar' várias vezes)."""
     partes = sorted(f"{s['jogo']}|{s['mercado']}" for s in multipla["selecoes"])
-    bruto = data_jogo + "::" + "::".join(partes)
+    bruto = data_jogo + "::" + tipo_mercado + "::" + "::".join(partes)
     return hashlib.sha256(bruto.encode()).hexdigest()[:16]
 
 
-def salvar_multiplas(data_jogo, multiplas):
+def salvar_multiplas(data_jogo, multiplas, tipo_mercado="todos"):
     """Salva cada múltipla gerada como 'pendente', ignorando duplicatas."""
     conn = _conectar()
     for m in multiplas:
-        chave = _chave_da_multipla(data_jogo, m)
+        chave = _chave_da_multipla(data_jogo, m, tipo_mercado)
         try:
             conn.execute(
-                "INSERT INTO historico (data_jogo, chave, odd_final, ev_final, selecoes_json, resultado, criado_em) "
-                "VALUES (?, ?, ?, ?, ?, 'pendente', ?)",
-                (data_jogo, chave, m["odd_final"], m["ev_final"], json.dumps(m["selecoes"]), datetime.utcnow().isoformat()),
+                "INSERT INTO historico (data_jogo, chave, odd_final, ev_final, selecoes_json, resultado, criado_em, tipo_mercado) "
+                "VALUES (?, ?, ?, ?, ?, 'pendente', ?, ?)",
+                (data_jogo, chave, m["odd_final"], m["ev_final"], json.dumps(m["selecoes"]), datetime.utcnow().isoformat(), tipo_mercado),
             )
         except sqlite3.IntegrityError:
             pass  # já salva antes, ignora
@@ -76,10 +80,11 @@ def _lucro_do_item(odd_final, resultado):
     return None  # pendente - ainda não conta
 
 
-def listar_por_data(data_jogo):
+def listar_por_data(data_jogo, tipo_mercado="todos"):
     conn = _conectar()
     linhas = conn.execute(
-        "SELECT * FROM historico WHERE data_jogo = ? ORDER BY ev_final DESC", (data_jogo,)
+        "SELECT * FROM historico WHERE data_jogo = ? AND tipo_mercado = ? ORDER BY ev_final DESC",
+        (data_jogo, tipo_mercado),
     ).fetchall()
     conn.close()
     return [
@@ -91,6 +96,7 @@ def listar_por_data(data_jogo):
             "selecoes": json.loads(r["selecoes_json"]),
             "resultado": r["resultado"],
             "lucro": _lucro_do_item(r["odd_final"], r["resultado"]),
+            "tipo_mercado": r["tipo_mercado"],
         }
         for r in linhas
     ]
@@ -114,6 +120,7 @@ def listar_historico(semana=None):
             "selecoes": json.loads(r["selecoes_json"]),
             "resultado": r["resultado"],
             "lucro": _lucro_do_item(r["odd_final"], r["resultado"]),
+            "tipo_mercado": r["tipo_mercado"],
         }
         for r in linhas
     ]
