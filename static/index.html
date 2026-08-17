@@ -299,6 +299,9 @@ function montarDias() {
       document.querySelectorAll(".dia-pill").forEach(p => p.classList.remove("ativo"));
       btn.classList.add("ativo");
       dataEscolhida = iso;
+      if (telaAtual === "probabilidade") {
+        renderModoProb();
+      }
     };
     cont.appendChild(btn);
   }
@@ -530,7 +533,7 @@ function combinacaoProbHtml(c, idx) {
 }
 
 async function renderModoProb() {
-  document.getElementById("dias").style.display = "none";
+  document.getElementById("dias").style.display = "flex";
   document.getElementById("tiposMercado").style.display = "none";
   document.getElementById("btnBuscar").style.display = "none";
   const cont = document.getElementById("resultado");
