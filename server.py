@@ -30,6 +30,7 @@ import serie_b_probabilidade
 import historico_prob
 import resultados_prob
 import sportmonks_diag
+import sportmonks_probabilidade
 
 app = Flask(__name__)
 CORS(app)  # permite o app web (rodando no celular) chamar este servidor
@@ -192,6 +193,77 @@ def api_historico_prob():
         "itens": historico_prob.listar_historico(),
         "semanas": historico_prob.resumo_semanal(),
     })
+@app.route("/api/todas-fontes")
+def api_todas_fontes():
+    """
+    Tenta buscar jogos de TODAS as fontes configuradas (The Odds API,
+    API Futebol Série B, SportMonks) e junta o que cada uma conseguir
+    entregar. Fontes indisponíveis (sem crédito, chave ausente, erro) são
+    simplesmente puladas, sem quebrar a resposta.
+
+    Importante: mantém separado o que tem odds reais (The Odds API - dá
+    pra calcular EV de verdade) do que é só probabilidade (SportMonks e
+    API Futebol - sem odds, não misturamos numa mesma múltipla).
+    """
+    data_str = request.args.get("data", date.today().isoformat())
+    prob_minima = float(request.args.get("prob_minima", 0.5))
+
+    fontes_ok = []
+    fontes_com_erro = {}
+
+    # 1) The Odds API (com odds reais, calcula EV)
+    resultado_odds = None
+    try:
+        debug_odds = {}
+        selecoes_odds = montar_jogos_reais(data_str, debug_info=debug_odds, ev_minimo=0.04, prob_minima=0.5)
+        multiplas_odds = montar_multiplas(selecoes_odds, min_selecoes=2, max_selecoes=3, odd_final_max=15.0)
+        resultado_odds = {"selecoes": selecoes_odds, "multiplas": multiplas_odds}
+        if selecoes_odds:
+            fontes_ok.append("the_odds_api")
+        elif debug_odds.get("total_jogos_odds_api", 0) == 0:
+            fontes_com_erro["the_odds_api"] = "sem créditos ou sem jogos retornados"
+    except Exception as exc:
+        fontes_com_erro["the_odds_api"] = str(exc)
+
+    # 2) API Futebol (Série B, só probabilidade)
+    selecoes_api_futebol = []
+    try:
+        if serie_b_probabilidade.disponivel():
+            selecoes_api_futebol = serie_b_probabilidade.gerar_selecoes_probabilidade(data_str, prob_minima=prob_minima)
+            if selecoes_api_futebol:
+                fontes_ok.append("api_futebol_serie_b")
+    except Exception as exc:
+        fontes_com_erro["api_futebol_serie_b"] = str(exc)
+
+    # 3) SportMonks (ligas do plano, só probabilidade)
+    selecoes_sportmonks = []
+    try:
+        if sportmonks_probabilidade.disponivel():
+            debug_sm = {}
+            selecoes_sportmonks = sportmonks_probabilidade.gerar_selecoes(data_str, prob_minima=prob_minima, debug_info=debug_sm)
+            if selecoes_sportmonks:
+                fontes_ok.append("sportmonks")
+    except Exception as exc:
+        fontes_com_erro["sportmonks"] = str(exc)
+
+    # junta as duas fontes "só probabilidade" (não misturam com odds reais)
+    for s in selecoes_api_futebol:
+        s.setdefault("liga", "Brasileirão Série B")
+    selecoes_prob = sorted(selecoes_api_futebol + selecoes_sportmonks, key=lambda s: s["prob_real"], reverse=True)
+    combinacoes_prob = serie_b_probabilidade.montar_combinacoes(selecoes_prob, 2, 3) if selecoes_prob else []
+
+    return jsonify({
+        "data": data_str,
+        "fontes_disponiveis": fontes_ok,
+        "fontes_com_erro": fontes_com_erro,
+        "com_odds_the_odds_api": resultado_odds,
+        "somente_probabilidade": {
+            "selecoes": selecoes_prob,
+            "combinacoes": combinacoes_prob,
+        },
+    })
+
+
 @app.route("/api/sportmonks-amostra-placar/<int:liga_id>")
 def api_sportmonks_amostra_placar(liga_id):
     if not sportmonks_diag.disponivel():
