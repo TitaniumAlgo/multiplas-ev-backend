@@ -31,6 +31,7 @@ import historico_prob
 import resultados_prob
 import sportmonks_diag
 import sportmonks_probabilidade
+import espn_diag
 
 app = Flask(__name__)
 CORS(app)  # permite o app web (rodando no celular) chamar este servidor
@@ -272,6 +273,30 @@ def api_sportmonks_amostra_placar(liga_id):
         return jsonify(sportmonks_diag.buscar_amostra_fixture_com_placar(liga_id))
     except Exception as exc:
         return jsonify({"erro": str(exc)}), 502
+
+
+@app.route("/api/espn-diagnostico")
+def api_espn_diagnostico():
+    data_str = request.args.get("data")  # formato YYYY-MM-DD, opcional
+    resultado = {}
+    for nome, codigo in espn_diag.LIGAS_BRASIL.items():
+        try:
+            scoreboard = espn_diag.buscar_scoreboard(codigo, data_str)
+            eventos = scoreboard.get("events", [])
+            resultado[nome] = {
+                "total_jogos": len(eventos),
+                "amostra": eventos[0] if eventos else None,
+            }
+        except Exception as exc:
+            resultado[nome] = {"erro": str(exc)}
+
+        try:
+            standings = espn_diag.buscar_standings(codigo)
+            resultado[nome + "_standings_bruto"] = standings
+        except Exception as exc:
+            resultado[nome + "_standings_erro"] = str(exc)
+
+    return jsonify(resultado)
 
 
 @app.route("/api/sportmonks-diagnostico")
