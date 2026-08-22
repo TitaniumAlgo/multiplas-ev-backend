@@ -209,7 +209,23 @@ def api_sportmonks_diagnostico():
         "meta_da_conta": meta,
     }
 
-    if ligas_brasil:
+    todas_ligas = request.args.get("todas") == "1"
+    if todas_ligas:
+        ligas, _ = sportmonks_diag.buscar_ligas()
+        resultado["todas_as_ligas"] = [
+            {"id": l.get("id"), "name": l.get("name")} for l in ligas if isinstance(l, dict)
+        ]
+        jogos_por_liga = {}
+        for liga in ligas:
+            if not isinstance(liga, dict):
+                continue
+            try:
+                jogos = sportmonks_diag.buscar_jogos_data(liga["id"], data_str)
+                jogos_por_liga[liga.get("name", str(liga.get("id")))] = [j.get("name") for j in jogos]
+            except Exception as exc:
+                jogos_por_liga[liga.get("name", str(liga.get("id")))] = f"erro: {exc}"
+        resultado["jogos_na_data_todas_ligas"] = jogos_por_liga
+    elif ligas_brasil:
         jogos_por_liga = {}
         for liga in ligas_brasil:
             try:
