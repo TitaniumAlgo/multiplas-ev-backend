@@ -53,3 +53,43 @@ def buscar_jogos_data(liga_id, data_str):
     )
     resp.raise_for_status()
     return resp.json().get("data", [])
+
+
+def buscar_temporada_atual(liga_id):
+    """Descobre o season_id atual de uma liga."""
+    resp = requests.get(
+        f"{SPORTMONKS_BASE}/leagues/{liga_id}",
+        params={"api_token": SPORTMONKS_TOKEN, "include": "currentSeason"},
+        timeout=20,
+    )
+    resp.raise_for_status()
+    body = resp.json().get("data", {})
+    temporada = body.get("currentSeason") or body.get("current_season")
+    return temporada.get("id") if temporada else None
+
+
+def buscar_amostra_fixture_com_placar(liga_id):
+    """Pega 1 jogo já finalizado da liga, com participants+scores, pra
+    ver o formato exato que a API devolve (evita adivinhar a estrutura)."""
+    season_id = buscar_temporada_atual(liga_id)
+    if season_id is None:
+        return {"erro": "season_id não encontrado"}
+
+    resp = requests.get(
+        f"{SPORTMONKS_BASE}/fixtures",
+        params={
+            "api_token": SPORTMONKS_TOKEN,
+            "filters": f"fixtureLeagues:{liga_id}",
+            "include": "participants;scores",
+            "per_page": 25,
+        },
+        timeout=20,
+    )
+    resp.raise_for_status()
+    jogos = resp.json().get("data", [])
+
+    finalizados = [j for j in jogos if j.get("scores")]
+    if not finalizados:
+        return {"season_id": season_id, "total_jogos_amostra": len(jogos), "amostra": None}
+
+    return {"season_id": season_id, "total_jogos_amostra": len(jogos), "amostra": finalizados[0]}
