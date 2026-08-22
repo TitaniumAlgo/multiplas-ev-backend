@@ -29,6 +29,7 @@ import resultados
 import serie_b_probabilidade
 import historico_prob
 import resultados_prob
+import sportmonks_diag
 
 app = Flask(__name__)
 CORS(app)  # permite o app web (rodando no celular) chamar este servidor
@@ -191,6 +192,37 @@ def api_historico_prob():
         "itens": historico_prob.listar_historico(),
         "semanas": historico_prob.resumo_semanal(),
     })
+@app.route("/api/sportmonks-diagnostico")
+def api_sportmonks_diagnostico():
+    if not sportmonks_diag.disponivel():
+        return jsonify({"erro": "SPORTMONKS_API_TOKEN não configurado no servidor."}), 502
+
+    data_str = request.args.get("data", date.today().isoformat())
+    try:
+        ligas_brasil, total_ligas, meta = sportmonks_diag.encontrar_ligas_brasil()
+    except Exception as exc:
+        return jsonify({"erro": str(exc)}), 502
+
+    resultado = {
+        "total_ligas_no_plano": total_ligas,
+        "ligas_brasil_encontradas": ligas_brasil,
+        "meta_da_conta": meta,
+    }
+
+    if ligas_brasil:
+        jogos_por_liga = {}
+        for liga in ligas_brasil:
+            try:
+                jogos = sportmonks_diag.buscar_jogos_data(liga["id"], data_str)
+                jogos_por_liga[liga["name"]] = [j.get("name") for j in jogos]
+            except Exception as exc:
+                jogos_por_liga[liga["name"]] = f"erro: {exc}"
+        resultado["jogos_na_data"] = jogos_por_liga
+
+    return jsonify(resultado)
+
+
+@app.route("/api/historico")
 def api_historico():
     """Lista o histórico. Opcional: ?semana=2026-W33 pra filtrar uma semana."""
     try:
