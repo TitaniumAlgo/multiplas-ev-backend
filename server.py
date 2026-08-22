@@ -192,6 +192,16 @@ def api_historico_prob():
         "itens": historico_prob.listar_historico(),
         "semanas": historico_prob.resumo_semanal(),
     })
+@app.route("/api/sportmonks-amostra-placar/<int:liga_id>")
+def api_sportmonks_amostra_placar(liga_id):
+    if not sportmonks_diag.disponivel():
+        return jsonify({"erro": "SPORTMONKS_API_TOKEN não configurado."}), 502
+    try:
+        return jsonify(sportmonks_diag.buscar_amostra_fixture_com_placar(liga_id))
+    except Exception as exc:
+        return jsonify({"erro": str(exc)}), 502
+
+
 @app.route("/api/sportmonks-diagnostico")
 def api_sportmonks_diagnostico():
     if not sportmonks_diag.disponivel():
