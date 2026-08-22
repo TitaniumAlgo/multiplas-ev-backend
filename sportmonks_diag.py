@@ -64,16 +64,20 @@ def buscar_temporada_atual(liga_id):
     )
     resp.raise_for_status()
     body = resp.json().get("data", {})
-    temporada = body.get("currentSeason") or body.get("current_season")
-    return temporada.get("id") if temporada else None
+    temporada = (
+        body.get("currentSeason") or body.get("currentseason") or body.get("current_season")
+    )
+    if temporada is None:
+        return None, body  # devolve o corpo bruto pra depurar o que realmente veio
+    return temporada.get("id"), body
 
 
 def buscar_amostra_fixture_com_placar(liga_id):
     """Pega 1 jogo já finalizado da liga, com participants+scores, pra
     ver o formato exato que a API devolve (evita adivinhar a estrutura)."""
-    season_id = buscar_temporada_atual(liga_id)
+    season_id, liga_body = buscar_temporada_atual(liga_id)
     if season_id is None:
-        return {"erro": "season_id não encontrado"}
+        return {"erro": "season_id não encontrado", "liga_body_bruto": liga_body}
 
     resp = requests.get(
         f"{SPORTMONKS_BASE}/fixtures",
