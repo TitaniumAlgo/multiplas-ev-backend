@@ -32,6 +32,7 @@ import resultados_prob
 import sportmonks_diag
 import sportmonks_probabilidade
 import espn_diag
+import espn_probabilidade
 
 app = Flask(__name__)
 CORS(app)  # permite o app web (rodando no celular) chamar este servidor
@@ -273,6 +274,35 @@ def api_sportmonks_amostra_placar(liga_id):
         return jsonify(sportmonks_diag.buscar_amostra_fixture_com_placar(liga_id))
     except Exception as exc:
         return jsonify({"erro": str(exc)}), 502
+
+
+@app.route("/api/espn-multiplas")
+def api_espn_multiplas():
+    """
+    Múltiplas (3-4 seleções) via ESPN (Série A + B), cobrindo vencedor,
+    gols, escanteios e cartões - agrupadas por faixa de probabilidade
+    mínima: 50%, 60%, 70%, 80%, 90%.
+    """
+    data_str = request.args.get("data", date.today().isoformat())
+    incluir_extras = request.args.get("escanteios_cartoes", "1") == "1"
+
+    debug_info = {}
+    try:
+        selecoes = espn_probabilidade.gerar_selecoes(
+            data_str, prob_minima=0.5, incluir_escanteios_cartoes=incluir_extras, debug_info=debug_info
+        )
+    except Exception as exc:
+        return jsonify({"erro": str(exc), "debug": debug_info}), 502
+
+    combinacoes_por_faixa = espn_probabilidade.montar_combinacoes_por_faixa(selecoes)
+
+    return jsonify({
+        "data": data_str,
+        "aviso": "Modo sem odds reais (ESPN, dados públicos) - probabilidade calculada, não valor de mercado",
+        "total_selecoes": len(selecoes),
+        "combinacoes_por_faixa": combinacoes_por_faixa,
+        "debug": debug_info,
+    })
 
 
 @app.route("/api/espn-diagnostico")
