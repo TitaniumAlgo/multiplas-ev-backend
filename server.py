@@ -33,6 +33,7 @@ import sportmonks_diag
 import sportmonks_probabilidade
 import espn_diag
 import espn_probabilidade
+import resultados_espn
 
 app = Flask(__name__)
 CORS(app)  # permite o app web (rodando no celular) chamar este servidor
@@ -191,6 +192,10 @@ def api_historico_prob():
         resultados_prob.atualizar_pendentes()
     except Exception:
         pass
+    try:
+        resultados_espn.atualizar_pendentes()
+    except Exception:
+        pass
     return jsonify({
         "itens": historico_prob.listar_historico(),
         "semanas": historico_prob.resumo_semanal(),
@@ -279,12 +284,37 @@ def api_sportmonks_amostra_placar(liga_id):
 @app.route("/api/espn-multiplas")
 def api_espn_multiplas():
     """
-    Múltiplas (3-4 seleções) via ESPN (Série A + B), cobrindo vencedor,
+    Múltiplas (2+ seleções) via ESPN (Série A + B), cobrindo vencedor,
     gols, escanteios e cartões - agrupadas por faixa de probabilidade
-    mínima: 50%, 60%, 70%, 80%, 90%.
+    mínima: 50%, 60%, 70%, 80%, 90%. Trava por dia (cada faixa só gera
+    uma vez, depois fica salva) e entra no histórico de acerto/erro.
     """
     data_str = request.args.get("data", date.today().isoformat())
     incluir_extras = request.args.get("escanteios_cartoes", "1") == "1"
+    forcar_nova_busca = request.args.get("forcar") == "1"
+
+    faixas = ["50%", "60%", "70%", "80%", "90%"]
+
+    if not forcar_nova_busca:
+        ja_salvo = {}
+        tudo_salvo = True
+        for faixa in faixas:
+            itens = historico_prob.listar_por_data(data_str, tipo_mercado=f"espn_{faixa}")
+            if itens:
+                ja_salvo[faixa] = [
+                    {"prob_final": i["prob_final"], "selecoes": i["selecoes"], "id": i["id"], "resultado": i["resultado"]}
+                    for i in itens
+                ]
+            else:
+                tudo_salvo = False
+        if tudo_salvo:
+            return jsonify({
+                "data": data_str,
+                "de_cache": True,
+                "aviso": "Modo sem odds reais (ESPN, dados públicos) - probabilidade calculada, não valor de mercado",
+                "combinacoes_por_faixa": ja_salvo,
+                "debug": {},
+            })
 
     debug_info = {}
     try:
@@ -295,6 +325,12 @@ def api_espn_multiplas():
         return jsonify({"erro": str(exc), "debug": debug_info}), 502
 
     combinacoes_por_faixa = espn_probabilidade.montar_combinacoes_por_faixa(selecoes, min_selecoes=2, max_selecoes=4)
+
+    for faixa, combos in combinacoes_por_faixa.items():
+        try:
+            historico_prob.salvar_combinacoes(data_str, combos, tipo_mercado=f"espn_{faixa}")
+        except Exception:
+            pass
 
     return jsonify({
         "data": data_str,
