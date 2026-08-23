@@ -36,6 +36,11 @@ def _mesmo_time(a, b):
     return a == b or (a and a in b) or (b and b in a)
 
 
+def _limitar_prob(p):
+    """Nunca deixa passar como 'certeza absoluta' - sempre existe incerteza real."""
+    return max(0.01, min(0.97, p))
+
+
 def buscar_jogos_do_dia(liga_codigo, data_str):
     params = {"dates": data_str.replace("-", "")} if data_str else {}
     resp = requests.get(f"{ESPN_BASE}/{liga_codigo}/scoreboard", params=params, timeout=20)
@@ -60,16 +65,33 @@ def buscar_jogos_do_dia(liga_codigo, data_str):
 
 
 def _extrair_medias_da_entrada(entrada):
-    """De uma entrada da tabela (standings), pega jogos/gols pró/gols contra."""
-    stats = {s.get("name"): s.get("value") for s in entrada.get("stats", [])}
-    jogos = stats.get("gamesplayed") or stats.get("gamesPlayed") or 1
-    gols_pro = stats.get("pointsfor") or stats.get("pointsFor") or 0
-    gols_contra = stats.get("pointsagainst") or stats.get("pointsAgainst") or 0
-    return {
-        "jogos": jogos,
-        "gols_marcados_media": gols_pro / jogos if jogos else 1.3,
-        "gols_sofridos_media": gols_contra / jogos if jogos else 1.3,
-    }
+    """De uma entrada da tabela (standings), pega jogos/gols pró/gols contra.
+    Busca de forma tolerante (ignora maiúscula/minúscula e aceita tanto
+    'name' quanto 'type'), porque a ESPN não é consistente na grafia
+    desses campos entre ligas."""
+    def _valor_por_apelidos(stats_lista, apelidos):
+        for s in stats_lista:
+            candidatos = [str(s.get("name") or "").lower(), str(s.get("type") or "").lower()]
+            if any(a in candidatos for a in apelidos):
+                valor = s.get("value")
+                if valor is not None:
+                    return float(valor)
+        return None
+
+    stats_lista = entrada.get("stats", [])
+    jogos = _valor_por_apelidos(stats_lista, ["gamesplayed"])
+    gols_pro = _valor_por_apelidos(stats_lista, ["pointsfor"])
+    gols_contra = _valor_por_apelidos(stats_lista, ["pointsagainst"])
+
+    # só usa os números se TODOS vieram e jogos é um valor plausível (>0);
+    # senão cai no chute conservador, em vez de gerar média absurda
+    if jogos and jogos > 0 and gols_pro is not None and gols_contra is not None:
+        return {
+            "jogos": jogos,
+            "gols_marcados_media": gols_pro / jogos,
+            "gols_sofridos_media": gols_contra / jogos,
+        }
+    return {"jogos": 0, "gols_marcados_media": 1.3, "gols_sofridos_media": 1.3}
 
 
 def buscar_medias_gols(liga_codigo):
@@ -213,6 +235,8 @@ def gerar_selecoes(data_str=None, prob_minima=0.5, incluir_escanteios_cartoes=Tr
             }
             for chave, nome_mercado in mapa.items():
                 prob = probs_gols.get(chave)
+                if prob is not None:
+                    prob = _limitar_prob(prob)
                 if prob is not None and prob >= prob_minima:
                     selecoes.append({"jogo": nome_jogo, "mercado": nome_mercado, "prob_real": round(prob, 4), "liga": liga_nome})
 
@@ -228,6 +252,7 @@ def gerar_selecoes(data_str=None, prob_minima=0.5, incluir_escanteios_cartoes=Tr
                     probs_cartoes = _poisson_over_under(media_cartoes, [2.5, 3.5, 4.5])
 
                     for nome_mercado, prob in {**probs_escanteios, **probs_cartoes}.items():
+                        prob = _limitar_prob(prob)
                         rotulo = f"{nome_mercado} escanteios" if nome_mercado in probs_escanteios else f"{nome_mercado} cartões"
                         if prob >= prob_minima:
                             selecoes.append({"jogo": nome_jogo, "mercado": rotulo, "prob_real": round(prob, 4), "liga": liga_nome})
