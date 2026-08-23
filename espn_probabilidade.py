@@ -263,25 +263,48 @@ def gerar_selecoes(data_str=None, prob_minima=0.5, incluir_escanteios_cartoes=Tr
     return sorted(selecoes, key=lambda s: s["prob_real"], reverse=True)
 
 
-def montar_combinacoes_por_faixa(selecoes, faixas=(0.5, 0.6, 0.7, 0.8, 0.9), min_selecoes=3, max_selecoes=4):
-    """Agrupa combinações de pelo menos 3 seleções por faixa de probabilidade
-    individual mínima (cada seleção da combinação precisa bater a faixa)."""
+def montar_combinacoes_por_faixa(selecoes, faixas=(0.5, 0.6, 0.7, 0.8, 0.9), min_selecoes=2, max_selecoes=4):
+    """Agrupa combinações de pelo menos 2 seleções por faixa de probabilidade.
+
+    Cada combinação aparece em UMA ÚNICA faixa - a que corresponde à sua
+    perna mais fraca (a que "segura" a confiança da múltipla inteira).
+    Assim, 50%/60%/70%/80%/90% mostram conjuntos DIFERENTES de múltiplas,
+    em vez de repetir as mesmas em todas as faixas superiores."""
     from itertools import combinations
 
-    resultado = {}
-    for faixa in faixas:
-        elegveis = [s for s in selecoes if s["prob_real"] >= faixa]
-        combinacoes = []
-        for n in range(min_selecoes, min(max_selecoes, len(elegveis)) + 1):
-            for combo in combinations(elegveis, n):
-                jogos = [s["jogo"] for s in combo]
-                if len(set(jogos)) != n:
-                    continue
-                prob_final = 1.0
-                for s in combo:
-                    prob_final *= s["prob_real"]
-                combinacoes.append({"selecoes": list(combo), "prob_final": round(prob_final, 4)})
-        combinacoes.sort(key=lambda c: c["prob_final"], reverse=True)
-        resultado[f"{int(faixa*100)}%"] = combinacoes[:10]  # top 10 por faixa, pra não pesar demais
+    elegveis = [s for s in selecoes if s["prob_real"] >= faixas[0]]
+    combinacoes_geradas = []
+    for n in range(min_selecoes, min(max_selecoes, len(elegveis)) + 1):
+        for combo in combinations(elegveis, n):
+            jogos = [s["jogo"] for s in combo]
+            if len(set(jogos)) != n:
+                continue
+            prob_final = 1.0
+            perna_mais_fraca = 1.0
+            for s in combo:
+                prob_final *= s["prob_real"]
+                perna_mais_fraca = min(perna_mais_fraca, s["prob_real"])
+            combinacoes_geradas.append({
+                "selecoes": list(combo),
+                "prob_final": round(prob_final, 4),
+                "perna_mais_fraca": perna_mais_fraca,
+            })
+
+    def _faixa_da_combinacao(perna_mais_fraca):
+        # acha a maior faixa que a perna mais fraca ainda atinge
+        faixa_certa = faixas[0]
+        for f in faixas:
+            if perna_mais_fraca >= f:
+                faixa_certa = f
+        return faixa_certa
+
+    resultado = {f"{int(f*100)}%": [] for f in faixas}
+    for combo in combinacoes_geradas:
+        faixa = _faixa_da_combinacao(combo["perna_mais_fraca"])
+        resultado[f"{int(faixa*100)}%"].append(combo)
+
+    for chave in resultado:
+        resultado[chave].sort(key=lambda c: c["prob_final"], reverse=True)
+        resultado[chave] = resultado[chave][:10]  # top 10 por faixa
 
     return resultado
