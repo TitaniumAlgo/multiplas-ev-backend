@@ -237,7 +237,7 @@
       <div class="subtitulo">seleções por valor esperado</div>
     </div>
     <button class="btn-icone" id="btnHistorico">Histórico</button>
-    <button class="btn-icone" id="btnModoProb" style="margin-left:6px;">Série B (sem odds)</button>
+    <button class="btn-icone" id="btnModoProb" style="margin-left:6px;">Sem odds (multi-fonte)</button>
   </div>
   <div class="dias" id="dias"></div>
   <div class="dias" id="tiposMercado" style="margin-top:8px;"></div>
@@ -264,17 +264,15 @@ function montarTiposMercado() {
     { valor: "gols", label: "Gols" },
   ];
   const cont = document.getElementById("tiposMercado");
+  cont.innerHTML = "";
   opcoes.forEach((op, i) => {
     const btn = document.createElement("button");
-    btn.className = "dia-pill" + (i === 0 ? " ativo" : "");
+    btn.className = "dia-pill" + (op.valor === tipoMercado ? " ativo" : "");
     btn.textContent = op.label;
     btn.onclick = () => {
       document.querySelectorAll("#tiposMercado .dia-pill").forEach(p => p.classList.remove("ativo"));
       btn.classList.add("ativo");
       tipoMercado = op.valor;
-      if (telaAtual === "probabilidade") {
-        renderModoProb();
-      }
     };
     cont.appendChild(btn);
   });
@@ -299,7 +297,7 @@ function montarDias() {
     btn.textContent = formatarDiaLabel(iso, i);
     btn.dataset.data = iso;
     btn.onclick = () => {
-      document.querySelectorAll(".dia-pill").forEach(p => p.classList.remove("ativo"));
+      document.querySelectorAll("#dias .dia-pill").forEach(p => p.classList.remove("ativo"));
       btn.classList.add("ativo");
       dataEscolhida = iso;
       if (telaAtual === "probabilidade") {
@@ -511,17 +509,21 @@ function renderTelaBuscar() {
   document.getElementById("dias").style.display = "flex";
   document.getElementById("tiposMercado").style.display = "flex";
   document.getElementById("btnBuscar").style.display = "flex";
+  montarTiposMercado();
   renderIdle();
 }
 
-// ---------------- Modo Série B sem odds (só probabilidade) ----------------
+// ---------------- Modo ESPN sem odds (gols/escanteios/cartões/vencedor por faixa) ----------------
+
+let faixaEscolhida = "50%";
 
 function combinacaoProbHtml(c, idx) {
+  const jogosTexto = [...new Set(c.selecoes.map(s => s.jogo))].join(" · ");
   const selecoesHtml = c.selecoes.map(s => `
-    <div class="selecao-linha">
+    <div class="selecao-linha" style="cursor:pointer;" onclick='abrirNaBet365(${JSON.stringify(s.jogo)}, this)'>
       <div style="min-width:0;">
         <div class="selecao-nome">${s.jogo}</div>
-        <div class="selecao-sub">${s.mercado}</div>
+        <div class="selecao-sub">${s.mercado}${s.liga ? " · " + s.liga : ""}</div>
       </div>
       <div class="selecao-odd" style="color:var(--gold);">${(s.prob_real * 100).toFixed(0)}%</div>
     </div>`).join("");
@@ -535,31 +537,48 @@ function combinacaoProbHtml(c, idx) {
     </div>`;
 }
 
+function montarFaixas() {
+  const opcoes = ["50%", "60%", "70%", "80%", "90%"];
+  const cont = document.getElementById("tiposMercado");
+  cont.innerHTML = "";
+  opcoes.forEach((op, i) => {
+    const btn = document.createElement("button");
+    btn.className = "dia-pill" + (op === faixaEscolhida ? " ativo" : "");
+    btn.textContent = op + "+";
+    btn.onclick = () => {
+      faixaEscolhida = op;
+      renderModoProb();
+    };
+    cont.appendChild(btn);
+  });
+}
+
 async function renderModoProb() {
   document.getElementById("dias").style.display = "flex";
   document.getElementById("tiposMercado").style.display = "flex";
   document.getElementById("btnBuscar").style.display = "none";
+  montarFaixas();
+
   const cont = document.getElementById("resultado");
-  cont.innerHTML = `<div class="idle">Buscando na Série B (API Futebol)...</div>`;
+  cont.innerHTML = `<div class="idle">Buscando na ESPN (Série A + B)... pode levar até 1 minuto na primeira vez.</div>`;
 
   try {
-    const resp = await fetch(`/api/serie-b-probabilidade?data=${dataEscolhida}&tipo_mercado=${tipoMercado}`);
+    const resp = await fetch(`/api/espn-multiplas?data=${dataEscolhida}`);
     const data = await resp.json();
     if (!resp.ok) throw new Error(data.erro || "Erro ao buscar.");
 
     let html = `<div class="erro-box" style="border-color:var(--gold-soft);background:rgba(212,165,55,0.08);">
       <span>ℹ️</span>
-      <div>Modo sem odds reais — mostra só a probabilidade calculada (Série B). Não representa aposta de valor.</div>
+      <div>Sem odds reais (ESPN, dados públicos) — vencedor, gols, escanteios e cartões. Toque num jogo pra abrir a Bet365.</div>
     </div>
     <button class="btn-icone" id="btnHistoricoProb" style="margin-bottom:14px;">Ver histórico de acerto/erro</button>`;
 
-    if (data.combinacoes && data.combinacoes.length > 0) {
-      html += data.combinacoes.map((c, i) => combinacaoProbHtml(c, i)).join("");
-    } else if (data.selecoes && data.selecoes.length > 0) {
-      html += `<div class="status-linha">Seleções prováveis (sem combinar):</div>`;
-      html += data.selecoes.map((s, i) => combinacaoProbHtml({ selecoes: [s], prob_final: s.prob_real }, i)).join("");
+    const combos = (data.combinacoes_por_faixa && data.combinacoes_por_faixa[faixaEscolhida]) || [];
+    if (combos.length > 0) {
+      html += `<div class="status-linha">${combos.length} múltipla(s) com ${faixaEscolhida}+ de chance por seleção</div>`;
+      html += combos.map((c, i) => combinacaoProbHtml(c, i)).join("");
     } else {
-      html += `<div class="vazio">Nenhum jogo da Série B encontrado pra essa data.</div>`;
+      html += `<div class="vazio">Nenhuma múltipla nessa faixa (${faixaEscolhida}+) hoje. Tenta uma faixa menor ou outro dia.</div>`;
     }
 
     cont.innerHTML = html;
