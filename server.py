@@ -294,7 +294,7 @@ def api_espn_multiplas():
     except Exception as exc:
         return jsonify({"erro": str(exc), "debug": debug_info}), 502
 
-    combinacoes_por_faixa = espn_probabilidade.montar_combinacoes_por_faixa(selecoes)
+    combinacoes_por_faixa = espn_probabilidade.montar_combinacoes_por_faixa(selecoes, min_selecoes=2, max_selecoes=4)
 
     return jsonify({
         "data": data_str,
