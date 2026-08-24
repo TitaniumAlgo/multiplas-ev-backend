@@ -259,8 +259,8 @@ def gerar_selecoes(data_str=None, prob_minima=0.5, incluir_escanteios_cartoes=Tr
                     media_escanteios = extra_casa["escanteios_media"] + extra_fora["escanteios_media"]
                     media_cartoes = extra_casa["cartoes_media"] + extra_fora["cartoes_media"]
 
-                    probs_escanteios = _poisson_over_under(media_escanteios, [8.5, 9.5, 10.5])
-                    probs_cartoes = _poisson_over_under(media_cartoes, [2.5, 3.5, 4.5])
+                    probs_escanteios = _poisson_over_under(media_escanteios, [9.5])
+                    probs_cartoes = _poisson_over_under(media_cartoes, [3.5])
 
                     for nome_mercado, prob in {**probs_escanteios, **probs_cartoes}.items():
                         prob = _limitar_prob(prob)
@@ -310,8 +310,12 @@ def montar_combinacoes_por_faixa(selecoes, faixas=(0.5, 0.6, 0.7, 0.8, 0.9), min
                 faixa_certa = f
         return faixa_certa
 
+    ODD_MINIMA_ACEITAVEL = 1.4  # abaixo disso, o retorno não compensa o risco
+
     resultado = {f"{int(f*100)}%": [] for f in faixas}
     for combo in combinacoes_geradas:
+        if combo["odd_estimada"] < ODD_MINIMA_ACEITAVEL:
+            continue  # descarta - odd baixa demais, não compensa
         faixa = _faixa_da_combinacao(combo["perna_mais_fraca"])
         resultado[f"{int(faixa*100)}%"].append(combo)
 
