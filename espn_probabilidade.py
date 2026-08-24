@@ -288,6 +288,7 @@ def montar_combinacoes_por_faixa(selecoes, faixas=(0.5, 0.6, 0.7, 0.8, 0.9), min
                 "selecoes": list(combo),
                 "prob_final": round(prob_final, 4),
                 "perna_mais_fraca": perna_mais_fraca,
+                "odd_estimada": round(1 / max(prob_final, 0.03), 2),
             })
 
     def _faixa_da_combinacao(perna_mais_fraca):
