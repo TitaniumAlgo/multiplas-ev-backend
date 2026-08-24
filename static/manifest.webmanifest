@@ -1,9 +1,9 @@
 {
-  "name": "Múltiplas EV",
-  "short_name": "Múltiplas EV",
+  "name": "Múltiplas · Probabilidade Real",
+  "short_name": "Múltiplas",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0E2A1D",
-  "theme_color": "#0E2A1D",
+  "background_color": "#0A0E1C",
+  "theme_color": "#0A0E1C",
   "icons": []
 }
