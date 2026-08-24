@@ -94,14 +94,15 @@ def _extrair_medias_da_entrada(entrada):
     return {"jogos": 0, "gols_marcados_media": 1.3, "gols_sofridos_media": 1.3}
 
 
-def buscar_medias_gols(liga_codigo):
+def buscar_medias_gols(liga_codigo, debug_info=None):
     """Tabela de classificação -> média de gols marcados/sofridos por time."""
     resp = requests.get(f"{ESPN_STANDINGS_BASE}/{liga_codigo}/standings", timeout=20)
     resp.raise_for_status()
     body = resp.json()
 
     medias = {}
-    # a estrutura pode vir com "children" (grupos) ou direto em "standings"
+    com_dados_reais = 0
+    no_fallback = 0
     grupos = body.get("children") or [body]
     for grupo in grupos:
         standings = grupo.get("standings", {})
@@ -109,7 +110,17 @@ def buscar_medias_gols(liga_codigo):
             nome_time = entrada.get("team", {}).get("displayName")
             if not nome_time:
                 continue
-            medias[_normalizar(nome_time)] = _extrair_medias_da_entrada(entrada)
+            m = _extrair_medias_da_entrada(entrada)
+            medias[_normalizar(nome_time)] = m
+            if m["jogos"] > 0:
+                com_dados_reais += 1
+            else:
+                no_fallback += 1
+
+    if debug_info is not None:
+        debug_info.setdefault("times_com_dados_reais_por_liga", {})[liga_codigo] = com_dados_reais
+        debug_info.setdefault("times_no_fallback_por_liga", {})[liga_codigo] = no_fallback
+
     return medias
 
 
@@ -212,7 +223,7 @@ def gerar_selecoes(data_str=None, prob_minima=0.5, incluir_escanteios_cartoes=Tr
     selecoes = []
     for liga_codigo, liga_nome in LIGAS.items():
         try:
-            medias_gols = buscar_medias_gols(liga_codigo)
+            medias_gols = buscar_medias_gols(liga_codigo, debug_info=debug_info)
             jogos = buscar_jogos_do_dia(liga_codigo, data_str)
         except Exception as exc:
             if debug_info is not None:
