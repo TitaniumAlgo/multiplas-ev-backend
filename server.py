@@ -302,7 +302,14 @@ def api_espn_multiplas():
             itens = historico_prob.listar_por_data(data_str, tipo_mercado=f"espn_{faixa}")
             if itens:
                 ja_salvo[faixa] = [
-                    {"prob_final": i["prob_final"], "selecoes": i["selecoes"], "id": i["id"], "resultado": i["resultado"]}
+                    {
+                        "prob_final": i["prob_final"],
+                        "odd_estimada": i["odd_estimada"],
+                        "lucro": i["lucro"],
+                        "selecoes": i["selecoes"],
+                        "id": i["id"],
+                        "resultado": i["resultado"],
+                    }
                     for i in itens
                 ]
             else:
