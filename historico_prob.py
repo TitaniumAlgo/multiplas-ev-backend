@@ -11,6 +11,23 @@ from datetime import datetime
 
 DB_PATH = "historico_prob.db"
 
+VALOR_APOSTA_SIMULADA = 10.0
+
+
+def _odd_estimada(prob_final):
+    return round(1 / max(prob_final, 0.03), 2)
+
+
+def _lucro_simulado(prob_final, resultado):
+    """Lucro/prejuízo simulado apostando R$10, usando uma odd ESTIMADA a
+    partir da própria probabilidade (não é odd real de casa de apostas -
+    essa fonte não tem odds, só estatística pública)."""
+    if resultado == "ganhou":
+        return round(VALOR_APOSTA_SIMULADA * (_odd_estimada(prob_final) - 1), 2)
+    if resultado == "perdeu":
+        return -VALOR_APOSTA_SIMULADA
+    return None
+
 
 def _conectar():
     conn = sqlite3.connect(DB_PATH)
@@ -86,6 +103,8 @@ def _linha_para_dict(r):
         "data_jogo": r["data_jogo"],
         "tipo_mercado": r["tipo_mercado"],
         "prob_final": r["prob_final"],
+        "odd_estimada": _odd_estimada(r["prob_final"]),
+        "lucro": _lucro_simulado(r["prob_final"], r["resultado"]),
         "selecoes": json.loads(r["selecoes_json"]),
         "resultado": r["resultado"],
     }
@@ -103,21 +122,32 @@ def marcar_resultado(item_id, resultado):
 def resumo_semanal():
     conn = _conectar()
     linhas = conn.execute("""
-        SELECT strftime('%Y-W%W', data_jogo) AS semana, resultado, COUNT(*) AS total
-        FROM historico_prob GROUP BY semana, resultado
+        SELECT strftime('%Y-W%W', data_jogo) AS semana, resultado, prob_final
+        FROM historico_prob
     """).fetchall()
     conn.close()
 
     resumo = {}
     for r in linhas:
         semana = r["semana"]
-        resumo.setdefault(semana, {"ganhou": 0, "perdeu": 0, "pendente": 0})
-        resumo[semana][r["resultado"]] = r["total"]
+        resumo.setdefault(semana, {"ganhou": 0, "perdeu": 0, "pendente": 0, "lucro": 0.0})
+        resumo[semana][r["resultado"]] += 1
+        lucro = _lucro_simulado(r["prob_final"], r["resultado"])
+        if lucro is not None:
+            resumo[semana]["lucro"] += lucro
 
     resultado = []
     for semana, contagem in resumo.items():
         decididas = contagem["ganhou"] + contagem["perdeu"]
         taxa = round(contagem["ganhou"] / decididas * 100, 1) if decididas else None
-        resultado.append({"semana": semana, **contagem, "taxa_acerto": taxa})
+        resultado.append({
+            "semana": semana,
+            "ganhou": contagem["ganhou"],
+            "perdeu": contagem["perdeu"],
+            "pendente": contagem["pendente"],
+            "taxa_acerto": taxa,
+            "lucro": round(contagem["lucro"], 2),
+            "investido": round(decididas * VALOR_APOSTA_SIMULADA, 2),
+        })
 
     return sorted(resultado, key=lambda x: x["semana"], reverse=True)
