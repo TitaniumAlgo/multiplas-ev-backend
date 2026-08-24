@@ -3,280 +3,324 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Múltiplas EV</title>
+<title>Múltiplas · Probabilidade Real</title>
 <link rel="manifest" href="/static/manifest.webmanifest">
-<meta name="theme-color" content="#0E2A1D">
+<meta name="theme-color" content="#071C10">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600;700&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #0E2A1D;
-    --bg-deep: #0A2016;
-    --card: #153826;
-    --card-border: #24503A;
+    --bg: #0B2818;
+    --bg-deep: #071C10;
+    --card: #123723;
+    --card-header: #0E2E1C;
+    --card-border: #1F4E33;
+    --chalk: #EDE7D9;
+    --chalk-dim: #9FB0A2;
     --gold: #D4A537;
-    --gold-soft: #8A7530;
-    --text: #F1EFE4;
-    --text-muted: #9FB5A8;
+    --gold-dim: #8A7530;
+    --gold-glow: rgba(212,165,55,0.22);
     --danger: #C1443C;
+    --danger-dim: rgba(193,68,60,0.16);
+    --success: #5AA66E;
+    --success-dim: rgba(90,166,110,0.18);
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html { scroll-behavior: smooth; }
   body {
     margin: 0;
-    background: var(--bg);
-    color: var(--text);
+    background: var(--bg-deep);
+    background-image: radial-gradient(circle at 50% 0%, rgba(212,165,55,0.05), transparent 55%);
+    color: var(--chalk);
     font-family: 'Inter', sans-serif;
     min-height: 100vh;
-    padding-bottom: 40px;
+    padding-bottom: 48px;
   }
+  ::selection { background: var(--gold-glow); }
+
+  /* ---------- topo ---------- */
   .topo {
     background: var(--bg-deep);
-    padding: 20px 20px 16px;
+    padding: 22px 20px 14px;
     border-bottom: 1px solid var(--card-border);
     position: sticky;
     top: 0;
-    z-index: 10;
+    z-index: 20;
   }
-  .topo-linha {
+  .marca { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 18px; }
+  .marca-titulo {
+    font-family: 'Oswald', sans-serif;
+    font-weight: 700;
+    font-size: 1.5rem;
+    letter-spacing: 0.02em;
+    line-height: 1;
+    color: var(--chalk);
+  }
+  .marca-titulo .accent { color: var(--gold); }
+  .marca-sub {
+    font-size: 0.72rem;
+    color: var(--chalk-dim);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-top: 4px;
+  }
+  .btn-hist {
+    background: none;
+    border: 1px solid var(--card-border);
+    border-radius: 999px;
+    color: var(--chalk-dim);
+    padding: 8px 16px;
+    font-family: 'Inter', sans-serif;
+    font-size: 0.76rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .btn-hist.ativo { color: var(--gold); border-color: var(--gold); background: var(--gold-glow); }
+
+  .linha-scroll { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; scrollbar-width: none; }
+  .linha-scroll::-webkit-scrollbar { display: none; }
+  .linha-scroll + .linha-scroll { margin-top: 10px; }
+
+  .pill {
+    flex-shrink: 0;
+    padding: 8px 15px;
+    border-radius: 999px;
+    border: 1px solid var(--card-border);
+    background: transparent;
+    color: var(--chalk-dim);
+    font-family: 'Inter', sans-serif;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: border-color .15s, color .15s, background .15s;
+  }
+  .pill.ativo { border-color: var(--gold); color: var(--gold); background: var(--gold-glow); }
+
+  .pill-faixa { font-family: 'JetBrains Mono', monospace; }
+  .pill-faixa .ponto {
+    display: inline-block; width: 6px; height: 6px; border-radius: 50%;
+    background: currentColor; margin-right: 6px; opacity: 0.7;
+  }
+
+  /* ---------- corpo ---------- */
+  .corpo { padding: 18px 20px 0; max-width: 560px; margin: 0 auto; }
+
+  .aviso {
+    display: flex; gap: 10px; align-items: flex-start;
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-left: 3px solid var(--gold-dim);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 18px;
+    font-size: 0.8rem;
+    color: var(--chalk-dim);
+    line-height: 1.5;
+  }
+  .aviso b { color: var(--chalk); }
+
+  .status-linha {
+    font-size: 0.78rem;
+    color: var(--chalk-dim);
+    margin-bottom: 12px;
+    font-family: 'Inter', sans-serif;
+  }
+
+  .vazio, .idle {
+    text-align: center;
+    color: var(--chalk-dim);
+    padding: 44px 16px;
+    font-size: 0.9rem;
+    line-height: 1.6;
+  }
+  .idle .icone { font-size: 1.8rem; margin-bottom: 12px; opacity: 0.6; }
+
+  /* ---------- bilhete (o elemento assinatura) ---------- */
+  .bilhete {
+    position: relative;
+    background: var(--card);
+    border: 1px solid var(--card-border);
+    border-radius: 16px;
+    margin-bottom: 22px;
+    overflow: hidden;
+    animation: surgir .3s ease both;
+  }
+  @keyframes surgir { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+  .bilhete-topo {
+    background: var(--card-header);
+    padding: 16px 18px 14px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 16px;
   }
-  .btn-icone {
-    background: none;
-    border: 1px solid var(--card-border);
-    border-radius: 8px;
-    color: var(--text-muted);
-    padding: 8px 12px;
+  .bilhete-num {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 0.7rem;
+    color: var(--chalk-dim);
+    letter-spacing: 0.05em;
+  }
+  .bilhete-prob {
+    font-family: 'Oswald', sans-serif;
+    font-weight: 700;
+    font-size: 2rem;
+    color: var(--gold);
+    line-height: 1;
+  }
+  .bilhete-prob small { font-size: 1rem; font-weight: 600; opacity: 0.8; }
+  .bilhete-odd { font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; color: var(--chalk-dim); margin-top: 2px; }
+
+  .bilhete-selo {
     font-family: 'Inter', sans-serif;
-    font-size: 0.78rem;
-    font-weight: 600;
+    font-weight: 700;
+    font-size: 0.72rem;
+    letter-spacing: 0.03em;
+    padding: 5px 12px;
+    border-radius: 999px;
+  }
+  .selo-pendente { background: rgba(159,176,162,0.14); color: var(--chalk-dim); }
+  .selo-ganhou { background: var(--success-dim); color: var(--success); }
+  .selo-perdeu { background: var(--danger-dim); color: var(--danger); }
+
+  /* perfuração estilo ticket */
+  .bilhete-corte {
+    position: relative;
+    height: 0;
+    border-top: 1.5px dashed var(--card-border);
+    margin: 0 14px;
+  }
+  .bilhete-corte::before, .bilhete-corte::after {
+    content: "";
+    position: absolute;
+    top: -8px;
+    width: 16px; height: 16px;
+    border-radius: 50%;
+    background: var(--bg-deep);
+  }
+  .bilhete-corte::before { left: -28px; }
+  .bilhete-corte::after { right: -28px; }
+
+  .bilhete-selecoes { padding: 6px 18px 4px; }
+  .selecao {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(31,78,51,0.6);
     cursor: pointer;
   }
-  .btn-icone.ativo { color: var(--gold); border-color: var(--gold); }
+  .selecao:last-child { border-bottom: none; }
+  .selecao:active { opacity: 0.7; }
+  .selecao-info { min-width: 0; }
+  .selecao-jogo {
+    font-size: 0.86rem;
+    font-weight: 600;
+    color: var(--chalk);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .selecao-mercado { font-size: 0.74rem; color: var(--chalk-dim); margin-top: 2px; }
+  .selecao-pct {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 700;
+    font-size: 0.92rem;
+    color: var(--gold);
+    flex-shrink: 0;
+  }
+
+  .bilhete-rodape {
+    padding: 10px 18px 14px;
+    font-size: 0.68rem;
+    color: var(--chalk-dim);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .bilhete-lucro { font-family: 'JetBrains Mono', monospace; font-weight: 700; }
+  .lucro-pos { color: var(--success); }
+  .lucro-neg { color: var(--danger); }
+
+  /* ---------- histórico ---------- */
   .semana-card {
     background: var(--card);
     border: 1px solid var(--card-border);
     border-radius: 14px;
-    padding: 14px 18px;
+    padding: 16px 18px;
     margin-bottom: 12px;
   }
-  .semana-topo { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-  .semana-titulo { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 0.95rem; }
-  .taxa-acerto { font-family: 'JetBrains Mono', monospace; font-weight: 700; color: var(--gold); }
-  .semana-contadores { display: flex; gap: 14px; font-size: 0.78rem; color: var(--text-muted); }
-  .item-historico {
-    background: var(--card);
-    border: 1px solid var(--card-border);
-    border-radius: 12px;
-    padding: 12px 16px;
-    margin-bottom: 10px;
+  .semana-topo { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+  .semana-titulo { font-family: 'Oswald', sans-serif; font-weight: 600; font-size: 0.9rem; text-transform: capitalize; }
+  .semana-lucro { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 1.05rem; }
+  .semana-stats { display: flex; gap: 16px; font-size: 0.76rem; color: var(--chalk-dim); flex-wrap: wrap; }
+  .semana-stats b { color: var(--chalk); }
+  .semana-taxa {
+    font-family: 'JetBrains Mono', monospace; font-weight: 700; color: var(--gold);
+    margin-left: auto;
   }
-  .item-topo { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-  .item-odd { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 1.1rem; }
-  .item-data { font-size: 0.74rem; color: var(--text-muted); }
-  .item-selecoes { font-size: 0.8rem; color: var(--text-muted); margin-bottom: 10px; line-height: 1.5; }
-  .botoes-resultado { display: flex; gap: 8px; }
-  .btn-resultado {
-    flex: 1;
-    padding: 8px 0;
-    border-radius: 8px;
-    border: 1px solid var(--card-border);
-    background: transparent;
-    color: var(--text-muted);
-    font-family: 'Inter', sans-serif;
-    font-size: 0.78rem;
-    font-weight: 600;
-    cursor: pointer;
-  }
-  .btn-resultado.ganhou.ativo { background: rgba(90,166,110,0.18); border-color: #5AA66E; color: #7FCB93; }
-  .btn-resultado.perdeu.ativo { background: rgba(193,68,60,0.16); border-color: var(--danger); color: #E38079; }
-  .btn-bet365 {
-    width: 100%;
-    margin-top: 10px;
-    padding: 10px 0;
-    border-radius: 8px;
-    border: 1px solid var(--gold-soft);
-    background: transparent;
-    color: var(--gold);
-    font-family: 'Inter', sans-serif;
-    font-size: 0.82rem;
-    font-weight: 600;
-    cursor: pointer;
-  }
-  .titulo {
-    font-family: 'Oswald', sans-serif;
-    font-weight: 700;
-    font-size: 1.3rem;
-    letter-spacing: 0.01em;
-  }
-  .titulo .accent { color: var(--gold); }
-  .subtitulo { font-size: 0.76rem; color: var(--text-muted); }
-  .dias {
-    display: flex;
-    gap: 8px;
-    overflow-x: auto;
-    padding-bottom: 4px;
-  }
-  .dia-pill {
-    flex-shrink: 0;
-    padding: 8px 16px;
-    border-radius: 999px;
-    border: 1px solid var(--card-border);
-    background: transparent;
-    color: var(--text-muted);
-    font-size: 0.82rem;
-    font-weight: 600;
-    cursor: pointer;
-    white-space: nowrap;
-    font-family: 'Inter', sans-serif;
-  }
-  .dia-pill.ativo {
-    border-color: var(--gold);
-    background: rgba(212,165,55,0.14);
-    color: var(--gold);
-  }
-  .corpo { padding: 18px 20px; }
-  .btn-buscar {
-    width: 100%;
-    background: var(--gold);
-    color: var(--bg-deep);
-    border: none;
-    border-radius: 12px;
-    padding: 14px 0;
+  .semana-rodape { font-size: 0.68rem; color: var(--chalk-dim); margin-top: 8px; opacity: 0.8; }
+
+  .secao-titulo {
     font-family: 'Oswald', sans-serif;
     font-weight: 600;
     font-size: 0.95rem;
-    letter-spacing: 0.03em;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    cursor: pointer;
-    margin-bottom: 20px;
+    color: var(--chalk);
+    margin: 26px 0 12px;
+    padding-top: 10px;
+    border-top: 1px solid var(--card-border);
   }
-  .btn-buscar:disabled { opacity: 0.75; cursor: default; }
-  .erro-box {
-    display: flex;
-    gap: 10px;
-    align-items: flex-start;
-    background: rgba(193,68,60,0.12);
-    border: 1px solid var(--danger);
-    border-radius: 10px;
-    padding: 12px 14px;
-    margin-bottom: 16px;
-    font-size: 0.85rem;
-  }
-  .status-linha {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 14px;
-    color: var(--text-muted);
-    font-size: 0.82rem;
-  }
-  .vazio {
-    text-align: center;
-    color: var(--text-muted);
-    padding: 30px 10px;
-    font-size: 0.88rem;
-  }
-  .idle {
-    text-align: center;
-    color: var(--text-muted);
-    padding: 50px 20px;
-    font-size: 0.9rem;
-    line-height: 1.6;
-  }
-  .card-multipla {
-    background: var(--card);
-    border: 1px solid var(--card-border);
-    border-radius: 14px;
-    padding: 16px 18px;
-    margin-bottom: 14px;
-  }
-  .card-topo {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 10px;
-  }
-  .card-num { color: var(--text-muted); font-size: 0.78rem; font-family: 'JetBrains Mono', monospace; }
-  .card-odd { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 1.7rem; line-height: 1; margin-left: 8px; }
-  .ev-badge {
-    font-family: 'JetBrains Mono', monospace;
+
+  .spin { animation: girar 1s linear infinite; display: inline-block; }
+  @keyframes girar { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+  .btn-copiado {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(0);
+    background: var(--gold);
+    color: var(--bg-deep);
+    font-family: 'Inter', sans-serif;
     font-weight: 700;
-    font-size: 0.78rem;
-    padding: 3px 8px;
-    border-radius: 4px;
+    font-size: 0.82rem;
+    padding: 10px 20px;
+    border-radius: 999px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+    z-index: 50;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .2s, transform .2s;
   }
-  .ev-pos { background: rgba(212,165,55,0.16); color: var(--gold); }
-  .selecao-linha {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 10px 0;
-    border-bottom: 1px solid var(--card-border);
-  }
-  .selecao-linha:last-child { border-bottom: none; }
-  .selecao-nome { font-size: 0.88rem; font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .selecao-sub { font-size: 0.76rem; color: var(--text-muted); margin-top: 2px; }
-  .selecao-odd { font-family: 'JetBrains Mono', monospace; font-weight: 700; font-size: 1rem; color: var(--gold); margin-left: 12px; flex-shrink: 0; }
-  .spin { animation: spin 1s linear infinite; display: inline-block; }
-  @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-  svg { vertical-align: middle; }
+  .btn-copiado.mostrar { opacity: 1; transform: translateX(-50%) translateY(-8px); }
 </style>
 </head>
 <body>
 
 <div class="topo">
-  <div class="topo-linha">
+  <div class="marca">
     <div>
-      <div class="titulo">MÚLTIPLAS <span class="accent">EV</span></div>
-      <div class="subtitulo">seleções por valor esperado</div>
+      <div class="marca-titulo">MÚLTIPLAS <span class="accent">·</span> PROB</div>
+      <div class="marca-sub">Brasileirão A &amp; B — probabilidade real</div>
     </div>
-    <button class="btn-icone" id="btnHistorico">Histórico</button>
-    <button class="btn-icone" id="btnModoProb" style="margin-left:6px;">Sem odds (multi-fonte)</button>
+    <button class="btn-hist" id="btnHistorico">Histórico</button>
   </div>
-  <div class="dias" id="dias"></div>
-  <div class="dias" id="tiposMercado" style="margin-top:8px;"></div>
+  <div class="linha-scroll" id="dias"></div>
+  <div class="linha-scroll" id="faixas"></div>
 </div>
 
 <div class="corpo">
-  <button class="btn-buscar" id="btnBuscar">
-    <span id="btnTexto">BUSCAR MÚLTIPLAS</span>
-  </button>
   <div id="resultado"></div>
 </div>
 
+<div class="btn-copiado" id="toastCopiado">✓ Copiado — abrindo Bet365</div>
+
 <script>
-const PALETTE_GOLD = "#D4A537";
-const PALETTE_DANGER = "#C1443C";
+const FAIXAS = ["50%", "60%", "70%", "80%", "90%"];
 
 let dataEscolhida = new Date().toISOString().slice(0, 10);
-let tipoMercado = "todos";
-
-function montarTiposMercado() {
-  const opcoes = [
-    { valor: "todos", label: "Todos" },
-    { valor: "vencedor", label: "Vencedor" },
-    { valor: "gols", label: "Gols" },
-  ];
-  const cont = document.getElementById("tiposMercado");
-  cont.innerHTML = "";
-  opcoes.forEach((op, i) => {
-    const btn = document.createElement("button");
-    btn.className = "dia-pill" + (op.valor === tipoMercado ? " ativo" : "");
-    btn.textContent = op.label;
-    btn.onclick = () => {
-      document.querySelectorAll("#tiposMercado .dia-pill").forEach(p => p.classList.remove("ativo"));
-      btn.classList.add("ativo");
-      tipoMercado = op.valor;
-    };
-    cont.appendChild(btn);
-  });
-}
+let faixaEscolhida = "50%";
+let telaAtual = "buscar"; // "buscar" | "historico"
 
 function formatarDiaLabel(isoStr, idx) {
   if (idx === 0) return "Hoje";
@@ -287,393 +331,202 @@ function formatarDiaLabel(isoStr, idx) {
 
 function montarDias() {
   const cont = document.getElementById("dias");
+  cont.innerHTML = "";
   const hoje = new Date();
   for (let i = 0; i < 7; i++) {
     const d = new Date(hoje);
     d.setDate(hoje.getDate() + i);
     const iso = d.toISOString().slice(0, 10);
     const btn = document.createElement("button");
-    btn.className = "dia-pill" + (i === 0 ? " ativo" : "");
+    btn.className = "pill" + (iso === dataEscolhida ? " ativo" : "");
     btn.textContent = formatarDiaLabel(iso, i);
-    btn.dataset.data = iso;
     btn.onclick = () => {
-      document.querySelectorAll("#dias .dia-pill").forEach(p => p.classList.remove("ativo"));
-      btn.classList.add("ativo");
       dataEscolhida = iso;
-      if (telaAtual === "probabilidade") {
-        renderModoProb();
-      }
+      montarDias();
+      if (telaAtual === "buscar") buscar();
     };
     cont.appendChild(btn);
   }
 }
 
-function renderIdle() {
-  document.getElementById("resultado").innerHTML = `
-    <div class="idle">
-      <div style="margin-bottom:10px;">📈</div>
-      <div>Escolha o dia acima e toque em "Buscar múltiplas" pra ver as combinações sugeridas.</div>
-    </div>`;
-}
-
-function renderErro(msg) {
-  document.getElementById("resultado").innerHTML = `
-    <div class="erro-box">
-      <span>⚠️</span>
-      <div>${msg}</div>
-    </div>`;
-}
-
-function selecaoHtml(s) {
-  const casasTexto = s.n_casas ? ` · ${s.n_casas} casas` : "";
-  return `
-    <div class="selecao-linha" style="cursor:pointer;" onclick='abrirNaBet365(${JSON.stringify(s.jogo)}, this)'>
-      <div style="min-width:0;">
-        <div class="selecao-nome">${s.jogo}</div>
-        <div class="selecao-sub">${s.mercado} · prob. real ${(s.prob_real * 100).toFixed(0)}%${casasTexto}</div>
-      </div>
-      <div class="selecao-odd">${s.odd.toFixed(2)}</div>
-    </div>`;
-}
-
-async function abrirNaBet365(jogosTexto, botao) {
-  try {
-    await navigator.clipboard.writeText(jogosTexto);
-    const textoOriginal = botao.textContent;
-    botao.textContent = "✓ Copiado! Abrindo...";
-    setTimeout(() => { botao.textContent = textoOriginal; }, 2000);
-  } catch (e) {
-    // se copiar falhar (ex: permissão negada), ainda assim abre a Bet365
-  }
-  window.open("https://www.bet365.com/", "_blank");
-}
-
-function multiplaHtml(m, idx) {
-  const selecoes = m.selecoes.map(selecaoHtml).join("");
-  const jogosTexto = [...new Set(m.selecoes.map(s => s.jogo))].join(" · ");
-  const probPct = (m.prob_final * 100).toFixed(0);
-  let selo;
-  if (m.resultado === "ganhou") {
-    selo = `<span class="ev-badge" style="background:rgba(90,166,110,0.18);color:#7FCB93;">✓ GREEN +R$${(10 * (m.odd_final - 1)).toFixed(2)}</span>`;
-  } else if (m.resultado === "perdeu") {
-    selo = `<span class="ev-badge" style="background:rgba(193,68,60,0.16);color:#E38079;">✕ RED -R$10,00</span>`;
-  } else {
-    selo = `<span class="ev-badge ev-pos">${probPct}% chance</span>`;
-  }
-  return `
-    <div class="card-multipla">
-      <div class="card-topo">
-        <div style="display:flex;align-items:baseline;">
-          <span class="card-num">#${idx + 1}</span>
-          <span class="card-odd">${m.odd_final.toFixed(2)}</span>
-        </div>
-        ${selo}
-      </div>
-      ${selecoes}
-      <div style="font-size:0.72rem;color:var(--text-muted);margin-top:8px;">EV +${(m.ev_final * 100).toFixed(1)}% · probabilidade combinada ${probPct}%</div>
-    </div>`;
-}
-
-async function buscar() {
-  const btn = document.getElementById("btnBuscar");
-  const btnTexto = document.getElementById("btnTexto");
-  btn.disabled = true;
-  btnTexto.innerHTML = '<span class="spin">↻</span> BUSCANDO...';
-
-  try {
-    const resp = await fetch(`/api/multiplas?data=${dataEscolhida}&tipo_mercado=${tipoMercado}`);
-    const data = await resp.json();
-    if (!resp.ok) throw new Error(data.erro || "Erro ao buscar múltiplas.");
-
-    const cont = document.getElementById("resultado");
-    if (!data.multiplas || data.multiplas.length === 0) {
-      let extra = "";
-      if (data.selecoes && data.selecoes.length > 0) {
-        extra = `<div style="margin-top:16px;"><div class="status-linha">Seleções com EV positivo hoje (sem combinar em múltipla ainda):</div>` +
-          data.selecoes.map(s => `<div class="card-multipla">${selecaoHtml(s)}</div>`).join("") + `</div>`;
-      }
-      const msgVazia = data.selecoes && data.selecoes.length > 0
-        ? "Nenhuma múltipla dentro do teto de odd pra essa data."
-        : "Nenhuma seleção segura (50%+ de chance e com vantagem real) encontrada hoje. Isso é esperado em dias fracos — melhor não forçar aposta do que arriscar numa zebra.";
-      cont.innerHTML = `<div class="vazio">${msgVazia}</div>${extra}`;
-    } else {
-      const jaTravado = data.de_cache;
-      const statusLinha = jaTravado
-        ? `<div class="status-linha">🔒 Múltiplas de hoje já geradas — travadas até os jogos terminarem</div>`
-        : `<div class="status-linha">✓ ${data.total_jogos_analisados || data.selecoes.length} seleção(ões) analisada(s) · ${data.multiplas.length} múltipla(s) encontrada(s)</div>`;
-      cont.innerHTML = statusLinha + data.multiplas.map(multiplaHtml).join("");
-    }
-  } catch (e) {
-    renderErro(e.message || "Não foi possível conectar ao servidor.");
-  } finally {
-    btn.disabled = false;
-    btnTexto.textContent = "BUSCAR MÚLTIPLAS";
-  }
-}
-
-montarDias();
-montarTiposMercado();
-renderIdle();
-document.getElementById("btnBuscar").addEventListener("click", buscar);
-
-// ---------------- Histórico ----------------
-
-let telaAtual = "buscar"; // "buscar" | "historico" | "probabilidade"
-
-function mesmaSemanaLabel(semanaIso) {
-  // semanaIso vem como "2026-W33"
-  return semanaIso.replace("-W", " · semana ");
-}
-
-function itemHistoricoHtml(item) {
-  const selecoesTexto = item.selecoes.map(s => `${s.jogo} — ${s.mercado} @${s.odd.toFixed(2)}`).join(" · ");
-  const dataFmt = new Date(item.data_jogo + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
-  const jogosTexto = [...new Set(item.selecoes.map(s => s.jogo))].join(" · ");
-  const tipoLabel = { todos: "Todos", vencedor: "Vencedor", gols: "Gols" }[item.tipo_mercado] || item.tipo_mercado || "Todos";
-
-  let selo;
-  if (item.resultado === "ganhou") {
-    selo = `<span class="ev-badge" style="background:rgba(90,166,110,0.18);color:#7FCB93;">✓ GREEN +R$${item.lucro.toFixed(2)}</span>`;
-  } else if (item.resultado === "perdeu") {
-    selo = `<span class="ev-badge" style="background:rgba(193,68,60,0.16);color:#E38079;">✕ RED -R$10,00</span>`;
-  } else {
-    selo = `<span class="ev-badge" style="background:rgba(159,181,168,0.14);color:var(--text-muted);">… aguardando jogo terminar</span>`;
-  }
-
-  return `
-    <div class="item-historico" data-id="${item.id}">
-      <div class="item-topo">
-        <span class="item-odd">${item.odd_final.toFixed(2)}</span>
-        <span class="item-data">${dataFmt} · ${tipoLabel}</span>
-      </div>
-      <div class="item-selecoes">${selecoesTexto}</div>
-      ${selo}
-    </div>`;
-}
-
-async function renderHistorico() {
-  document.getElementById("dias").style.display = "none";
-  document.getElementById("tiposMercado").style.display = "none";
-  document.getElementById("btnBuscar").style.display = "none";
-  const cont = document.getElementById("resultado");
-  cont.innerHTML = `<div class="idle">Carregando histórico...</div>`;
-
-  try {
-    const [respResumo, respItens] = await Promise.all([
-      fetch("/api/historico/resumo-semanal"),
-      fetch("/api/historico"),
-    ]);
-    const resumo = await respResumo.json();
-    const itens = await respItens.json();
-
-    let html = "";
-
-    if (resumo.semanas && resumo.semanas.length > 0) {
-      html += resumo.semanas.map(s => {
-        const lucroCor = s.lucro >= 0 ? "#7FCB93" : "#E38079";
-        const lucroTexto = s.lucro >= 0 ? `+R$${s.lucro.toFixed(2)}` : `-R$${Math.abs(s.lucro).toFixed(2)}`;
-        return `
-        <div class="semana-card">
-          <div class="semana-topo">
-            <span class="semana-titulo">${mesmaSemanaLabel(s.semana)}</span>
-            <span style="font-family:'JetBrains Mono',monospace;font-weight:700;color:${lucroCor};">${lucroTexto}</span>
-          </div>
-          <div class="semana-contadores">
-            <span>✓ ${s.ganhou} ganhas</span>
-            <span>✕ ${s.perdeu} perdidas</span>
-            <span>… ${s.pendente} pendentes</span>
-            ${s.taxa_acerto !== null ? `<span class="taxa-acerto">${s.taxa_acerto}% acerto</span>` : ""}
-          </div>
-          <div style="font-size:0.72rem;color:var(--text-muted);margin-top:6px;">apostando R$10,00 por múltipla · investido R$${s.investido.toFixed(2)}</div>
-        </div>`;
-      }).join("");
-    } else {
-      html += `<div class="vazio">Nenhum resumo semanal ainda — busque múltiplas em "Buscar" pra começar a acompanhar.</div>`;
-    }
-
-    html += `<div style="margin: 20px 0 10px; font-family:'Oswald',sans-serif; font-weight:600; font-size:0.95rem;">Todas as múltiplas salvas</div>`;
-
-    if (itens.itens && itens.itens.length > 0) {
-      html += itens.itens.map(itemHistoricoHtml).join("");
-    } else {
-      html += `<div class="vazio">Nada salvo ainda.</div>`;
-    }
-
-    cont.innerHTML = html;
-  } catch (e) {
-    cont.innerHTML = `<div class="erro-box"><span>⚠️</span><div>Não foi possível carregar o histórico.</div></div>`;
-  }
-}
-
-function renderTelaBuscar() {
-  document.getElementById("dias").style.display = "flex";
-  document.getElementById("tiposMercado").style.display = "flex";
-  document.getElementById("btnBuscar").style.display = "flex";
-  montarTiposMercado();
-  renderIdle();
-}
-
-// ---------------- Modo ESPN sem odds (gols/escanteios/cartões/vencedor por faixa) ----------------
-
-let faixaEscolhida = "50%";
-
-function combinacaoProbHtml(c, idx) {
-  const jogosTexto = [...new Set(c.selecoes.map(s => s.jogo))].join(" · ");
-  const selecoesHtml = c.selecoes.map(s => `
-    <div class="selecao-linha" style="cursor:pointer;" onclick='abrirNaBet365(${JSON.stringify(s.jogo)}, this)'>
-      <div style="min-width:0;">
-        <div class="selecao-nome">${s.jogo}</div>
-        <div class="selecao-sub">${s.mercado}${s.liga ? " · " + s.liga : ""}</div>
-      </div>
-      <div class="selecao-odd" style="color:var(--gold);">${(s.prob_real * 100).toFixed(0)}%</div>
-    </div>`).join("");
-  return `
-    <div class="card-multipla">
-      <div class="card-topo">
-        <span class="card-num">#${idx + 1}</span>
-        <span class="ev-badge ev-pos">${(c.prob_final * 100).toFixed(1)}% combinado</span>
-      </div>
-      ${selecoesHtml}
-    </div>`;
-}
-
 function montarFaixas() {
-  const opcoes = ["50%", "60%", "70%", "80%", "90%"];
-  const cont = document.getElementById("tiposMercado");
+  const cont = document.getElementById("faixas");
   cont.innerHTML = "";
-  opcoes.forEach((op, i) => {
+  FAIXAS.forEach(f => {
     const btn = document.createElement("button");
-    btn.className = "dia-pill" + (op === faixaEscolhida ? " ativo" : "");
-    btn.textContent = op + "+";
+    btn.className = "pill pill-faixa" + (f === faixaEscolhida ? " ativo" : "");
+    btn.innerHTML = `<span class="ponto"></span>${f}+`;
     btn.onclick = () => {
-      faixaEscolhida = op;
-      renderModoProb();
+      faixaEscolhida = f;
+      montarFaixas();
+      if (telaAtual === "buscar") renderResultadoAtual();
     };
     cont.appendChild(btn);
   });
 }
 
-async function renderModoProb() {
-  document.getElementById("dias").style.display = "flex";
-  document.getElementById("tiposMercado").style.display = "flex";
-  document.getElementById("btnBuscar").style.display = "none";
-  montarFaixas();
+let ultimoDataCarregada = null;
 
+async function abrirNaBet365(jogoTexto) {
+  try { await navigator.clipboard.writeText(jogoTexto); } catch (e) {}
+  const toast = document.getElementById("toastCopiado");
+  toast.classList.add("mostrar");
+  setTimeout(() => toast.classList.remove("mostrar"), 1800);
+  window.open("https://www.bet365.com/", "_blank");
+}
+
+function selecaoHtml(s) {
+  return `
+    <div class="selecao" onclick='abrirNaBet365(${JSON.stringify(s.jogo)})'>
+      <div class="selecao-info">
+        <div class="selecao-jogo">${s.jogo}</div>
+        <div class="selecao-mercado">${s.mercado}${s.liga ? " · " + s.liga : ""}</div>
+      </div>
+      <div class="selecao-pct">${(s.prob_real * 100).toFixed(0)}%</div>
+    </div>`;
+}
+
+function bilheteHtml(c, idx) {
+  const selecoesHtml = c.selecoes.map(selecaoHtml).join("");
+  let selo, rodapeExtra = "";
+  if (c.resultado === "ganhou") {
+    selo = `<span class="bilhete-selo selo-ganhou">✓ ACERTOU</span>`;
+    rodapeExtra = `<span class="bilhete-lucro lucro-pos">+R$${(c.lucro ?? 0).toFixed(2)}</span>`;
+  } else if (c.resultado === "perdeu") {
+    selo = `<span class="bilhete-selo selo-perdeu">✕ ERROU</span>`;
+    rodapeExtra = `<span class="bilhete-lucro lucro-neg">-R$10,00</span>`;
+  } else if (c.resultado === "pendente") {
+    selo = `<span class="bilhete-selo selo-pendente">Aguardando</span>`;
+  } else {
+    selo = `<span class="bilhete-selo selo-pendente">Prévia</span>`;
+  }
+
+  return `
+    <div class="bilhete">
+      <div class="bilhete-topo">
+        <div>
+          <div class="bilhete-num">MÚLTIPLA #${String(idx + 1).padStart(2, "0")}</div>
+          <div class="bilhete-prob">${(c.prob_final * 100).toFixed(0)}<small>%</small></div>
+          <div class="bilhete-odd">odd estimada ~${c.odd_estimada.toFixed(2)}</div>
+        </div>
+        ${selo}
+      </div>
+      <div class="bilhete-corte"></div>
+      <div class="bilhete-selecoes">${selecoesHtml}</div>
+      <div class="bilhete-rodape">
+        <span>toque num jogo pra abrir a Bet365</span>
+        ${rodapeExtra}
+      </div>
+    </div>`;
+}
+
+let ultimoResultado = null;
+
+function renderResultadoAtual() {
   const cont = document.getElementById("resultado");
-  cont.innerHTML = `<div class="idle">Buscando na ESPN (Série A + B)... pode levar até 1 minuto na primeira vez.</div>`;
+  const data = ultimoResultado;
+  if (!data) return;
+
+  const combos = (data.combinacoes_por_faixa && data.combinacoes_por_faixa[faixaEscolhida]) || [];
+  let html = `
+    <div class="aviso">
+      <span>ℹ️</span>
+      <div><b>Sem odds de casas de apostas</b> — dados públicos (ESPN). A odd mostrada é <b>estimada</b> a partir da própria probabilidade, só pra simular ganho/perda no histórico.</div>
+    </div>`;
+
+  if (combos.length > 0) {
+    html += `<div class="status-linha">${combos.length} múltipla(s) com pelo menos ${faixaEscolhida} de chance por seleção</div>`;
+    html += combos.map((c, i) => bilheteHtml(c, i)).join("");
+  } else {
+    html += `<div class="vazio">Nenhuma múltipla na faixa ${faixaEscolhida}+ pra esse dia.<br>Tenta uma faixa menor ou outra data.</div>`;
+  }
+  cont.innerHTML = html;
+}
+
+async function buscar() {
+  const cont = document.getElementById("resultado");
+  cont.innerHTML = `<div class="idle"><div class="icone spin">⏳</div>Buscando na ESPN (Série A + B)...<br>pode levar até 1 minuto na primeira vez do dia.</div>`;
 
   try {
     const resp = await fetch(`/api/espn-multiplas?data=${dataEscolhida}`);
     const data = await resp.json();
     if (!resp.ok) throw new Error(data.erro || "Erro ao buscar.");
-
-    let html = `<div class="erro-box" style="border-color:var(--gold-soft);background:rgba(212,165,55,0.08);">
-      <span>ℹ️</span>
-      <div>Sem odds reais (ESPN, dados públicos) — vencedor, gols, escanteios e cartões. Toque num jogo pra abrir a Bet365.</div>
-    </div>
-    <button class="btn-icone" id="btnHistoricoProb" style="margin-bottom:14px;">Ver histórico de acerto/erro</button>`;
-
-    const combos = (data.combinacoes_por_faixa && data.combinacoes_por_faixa[faixaEscolhida]) || [];
-    if (combos.length > 0) {
-      html += `<div class="status-linha">${combos.length} múltipla(s) com ${faixaEscolhida}+ de chance por seleção</div>`;
-      html += combos.map((c, i) => combinacaoProbHtml(c, i)).join("");
-    } else {
-      html += `<div class="vazio">Nenhuma múltipla nessa faixa (${faixaEscolhida}+) hoje. Tenta uma faixa menor ou outro dia.</div>`;
-    }
-
-    cont.innerHTML = html;
-    document.getElementById("btnHistoricoProb").addEventListener("click", renderHistoricoProb);
+    ultimoResultado = data;
+    renderResultadoAtual();
   } catch (e) {
-    cont.innerHTML = `<div class="erro-box"><span>⚠️</span><div>${e.message}</div></div>`;
+    cont.innerHTML = `<div class="aviso" style="border-left-color:var(--danger);"><span>⚠️</span><div>${e.message}</div></div>`;
   }
 }
 
-function itemHistoricoProbHtml(item) {
-  const selecoesTexto = item.selecoes.map(s => `${s.jogo} — ${s.mercado}`).join(" · ");
-  const dataFmt = new Date(item.data_jogo + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
-  let selo;
-  if (item.resultado === "ganhou") {
-    selo = `<span class="ev-badge" style="background:rgba(90,166,110,0.18);color:#7FCB93;">✓ ACERTOU</span>`;
-  } else if (item.resultado === "perdeu") {
-    selo = `<span class="ev-badge" style="background:rgba(193,68,60,0.16);color:#E38079;">✕ ERROU</span>`;
-  } else {
-    selo = `<span class="ev-badge" style="background:rgba(159,181,168,0.14);color:var(--text-muted);">… aguardando jogo terminar</span>`;
-  }
-  return `
-    <div class="item-historico">
-      <div class="item-topo">
-        <span class="item-odd">${(item.prob_final * 100).toFixed(0)}%</span>
-        <span class="item-data">${dataFmt}</span>
-      </div>
-      <div class="item-selecoes">${selecoesTexto}</div>
-      ${selo}
-    </div>`;
+function itemHistoricoHtml(item, idx) {
+  return bilheteHtml(item, idx);
 }
 
-async function renderHistoricoProb() {
+async function renderHistorico() {
   const cont = document.getElementById("resultado");
-  cont.innerHTML = `<div class="idle">Carregando histórico...</div>`;
+  cont.innerHTML = `<div class="idle"><div class="icone spin">⏳</div>Carregando histórico...</div>`;
+
   try {
     const resp = await fetch("/api/historico-prob");
     const data = await resp.json();
 
-    let html = `<button class="btn-icone" id="btnVoltarProb" style="margin-bottom:14px;">← Voltar</button>`;
-
+    let html = "";
     if (data.semanas && data.semanas.length > 0) {
-      html += data.semanas.map(s => `
+      html += data.semanas.map(s => {
+        const lucroClasse = s.lucro >= 0 ? "lucro-pos" : "lucro-neg";
+        const lucroTexto = s.lucro >= 0 ? `+R$${s.lucro.toFixed(2)}` : `-R$${Math.abs(s.lucro).toFixed(2)}`;
+        return `
         <div class="semana-card">
           <div class="semana-topo">
-            <span class="semana-titulo">${mesmaSemanaLabel(s.semana)}</span>
-            ${s.taxa_acerto !== null ? `<span class="taxa-acerto">${s.taxa_acerto}% acerto</span>` : ""}
+            <span class="semana-titulo">${s.semana.replace("-W", " · semana ")}</span>
+            <span class="semana-lucro ${lucroClasse}">${lucroTexto}</span>
           </div>
-          <div class="semana-contadores">
-            <span>✓ ${s.ganhou} acertos</span>
-            <span>✕ ${s.perdeu} erros</span>
-            <span>… ${s.pendente} pendentes</span>
+          <div class="semana-stats">
+            <span>✓ <b>${s.ganhou}</b> acertos</span>
+            <span>✕ <b>${s.perdeu}</b> erros</span>
+            <span>… <b>${s.pendente}</b> pendentes</span>
+            ${s.taxa_acerto !== null ? `<span class="semana-taxa">${s.taxa_acerto}%</span>` : ""}
           </div>
-        </div>`).join("");
+          <div class="semana-rodape">simulado com R$10,00 por múltipla (odd estimada) · investido R$${s.investido.toFixed(2)}</div>
+        </div>`;
+      }).join("");
     } else {
-      html += `<div class="vazio">Nenhum resumo ainda.</div>`;
+      html += `<div class="vazio">Nenhum resumo semanal ainda.</div>`;
     }
 
-    html += `<div style="margin:20px 0 10px; font-family:'Oswald',sans-serif; font-weight:600; font-size:0.95rem;">Todas as combinações</div>`;
+    html += `<div class="secao-titulo">Todas as múltiplas geradas</div>`;
     html += data.itens && data.itens.length > 0
-      ? data.itens.map(itemHistoricoProbHtml).join("")
-      : `<div class="vazio">Nada salvo ainda.</div>`;
+      ? data.itens.map(itemHistoricoHtml).join("")
+      : `<div class="vazio">Nada gerado ainda — busque múltiplas pra começar.</div>`;
 
     cont.innerHTML = html;
-    document.getElementById("btnVoltarProb").addEventListener("click", renderModoProb);
   } catch (e) {
-    cont.innerHTML = `<div class="erro-box"><span>⚠️</span><div>Não foi possível carregar.</div></div>`;
+    cont.innerHTML = `<div class="aviso" style="border-left-color:var(--danger);"><span>⚠️</span><div>Não foi possível carregar o histórico.</div></div>`;
   }
 }
 
-document.getElementById("btnModoProb").addEventListener("click", () => {
-  document.getElementById("btnHistorico").classList.remove("ativo");
-  document.getElementById("btnModoProb").classList.toggle("ativo");
-  if (telaAtual !== "probabilidade") {
-    telaAtual = "probabilidade";
-    renderModoProb();
-  } else {
-    telaAtual = "buscar";
-    renderTelaBuscar();
-  }
-});
-
 document.getElementById("btnHistorico").addEventListener("click", () => {
-  document.getElementById("btnModoProb").classList.remove("ativo");
+  const btn = document.getElementById("btnHistorico");
   if (telaAtual === "buscar") {
     telaAtual = "historico";
-    document.getElementById("btnHistorico").textContent = "Buscar múltiplas";
-    document.getElementById("btnHistorico").classList.add("ativo");
+    btn.textContent = "Buscar";
+    btn.classList.add("ativo");
+    document.getElementById("dias").style.display = "none";
+    document.getElementById("faixas").style.display = "none";
     renderHistorico();
   } else {
     telaAtual = "buscar";
-    document.getElementById("btnHistorico").textContent = "Histórico";
-    document.getElementById("btnHistorico").classList.remove("ativo");
-    renderTelaBuscar();
+    btn.textContent = "Histórico";
+    btn.classList.remove("ativo");
+    document.getElementById("dias").style.display = "flex";
+    document.getElementById("faixas").style.display = "flex";
+    if (ultimoResultado) { renderResultadoAtual(); } else { buscar(); }
   }
 });
+
+montarDias();
+montarFaixas();
+buscar();
 </script>
 </body>
 </html>
