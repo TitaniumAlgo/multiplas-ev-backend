@@ -137,10 +137,10 @@ def atualizar_pendentes():
             avaliacoes.append(_avaliar_selecao(selecao, resultado))
 
         if any(a is False for a in avaliacoes):
-            historico_prob.marcar_resultado(item["id"], "perdeu")
+            historico_prob.marcar_resultado(item["id"], "perdeu", selecoes_resultado=avaliacoes)
             atualizadas += 1
         elif avaliacoes and all(a is True for a in avaliacoes):
-            historico_prob.marcar_resultado(item["id"], "ganhou")
+            historico_prob.marcar_resultado(item["id"], "ganhou", selecoes_resultado=avaliacoes)
             atualizadas += 1
 
     return atualizadas
