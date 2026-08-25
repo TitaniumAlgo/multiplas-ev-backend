@@ -375,11 +375,17 @@ async function abrirNaBet365(jogoTexto) {
   window.open("https://www.bet365.com/", "_blank");
 }
 
-function selecaoHtml(s) {
+function selecaoHtml(s, resultadoPerna) {
+  let selo = "";
+  if (resultadoPerna === true) {
+    selo = `<span style="color:var(--success);font-weight:700;margin-right:6px;">✓</span>`;
+  } else if (resultadoPerna === false) {
+    selo = `<span style="color:var(--danger);font-weight:700;margin-right:6px;">✕</span>`;
+  }
   return `
     <div class="selecao" onclick='abrirNaBet365(${JSON.stringify(s.jogo)})'>
       <div class="selecao-info">
-        <div class="selecao-jogo">${s.jogo}</div>
+        <div class="selecao-jogo">${selo}${s.jogo}</div>
         <div class="selecao-mercado">${s.mercado}${s.liga ? " · " + s.liga : ""}</div>
       </div>
       <div class="selecao-pct">${(s.prob_real * 100).toFixed(0)}%</div>
@@ -387,7 +393,8 @@ function selecaoHtml(s) {
 }
 
 function bilheteHtml(c, idx) {
-  const selecoesHtml = c.selecoes.map(selecaoHtml).join("");
+  const resultadosPerna = c.selecoes_resultado || [];
+  const selecoesHtml = c.selecoes.map((s, i) => selecaoHtml(s, resultadosPerna[i])).join("");
   let selo, rodapeExtra = "";
   if (c.resultado === "ganhou") {
     selo = `<span class="bilhete-selo selo-ganhou">✓ ACERTOU</span>`;
