@@ -445,13 +445,7 @@ function renderResultadoAtual() {
     html += `<div class="status-linha">${combos.length} múltipla(s) com pelo menos ${faixaEscolhida} de chance por seleção</div>`;
     html += combos.map((c, i) => bilheteHtml(c, i)).join("");
   } else {
-    const todasFaixasVazias = FAIXAS.every(f => !(data.combinacoes_por_faixa && data.combinacoes_por_faixa[f] && data.combinacoes_por_faixa[f].length));
-    if (todasFaixasVazias && data.selecoes && data.selecoes.length > 0) {
-      html += `<div class="status-linha">Poucos jogos hoje pra formar múltipla que compense — aqui vão as seleções individuais mais prováveis:</div>`;
-      html += data.selecoes.slice(0, 8).map((s, i) => bilheteHtml({ selecoes: [s], prob_final: s.prob_real, odd_estimada: Math.round((1/Math.max(s.prob_real,0.03))*100)/100 }, i)).join("");
-    } else {
-      html += `<div class="vazio">Nenhuma múltipla na faixa ${faixaEscolhida}+ pra esse dia.<br>Tenta uma faixa menor ou outra data.</div>`;
-    }
+    html += `<div class="vazio">Nenhuma múltipla que compense na faixa ${faixaEscolhida}+ pra esse dia (poucos jogos ou odd baixa demais).<br>Tenta uma faixa menor ou outra data.</div>`;
   }
   cont.innerHTML = html;
 }
