@@ -92,17 +92,40 @@ def _extrair_escanteios_cartoes(fixture_evento):
     return resultado
 
 
-def _extrair_gols_1o_tempo(competidor):
-    """Pega o placar do intervalo (1º período) de um competidor, se disponível."""
+def _extrair_gols_1o_tempo_bruto(competidor):
+    """Pega o valor bruto do placar do intervalo (1º período), se disponível."""
     linescores = competidor.get("linescores") or []
     if not linescores:
         return None
-    primeiro = linescores[0]
-    valor = primeiro.get("value") if isinstance(primeiro, dict) else None
+    return linescores[0]
+
+
+def _extrair_valor_numerico(campo):
+    """O placar/valor pode vir como número direto, string, ou objeto tipo
+    {'value': 2, 'displayValue': '2'} - tenta reconhecer qualquer um."""
+    if campo is None:
+        return None
+    if isinstance(campo, dict):
+        campo = campo.get("value", campo.get("displayValue"))
     try:
-        return float(valor) if valor is not None else None
+        return float(campo)
     except (TypeError, ValueError):
         return None
+
+
+def _jogo_finalizado(evento_ou_comp):
+    """Confere se o jogo terminou, tentando os formatos conhecidos de
+    status que a ESPN usa (pode variar entre endpoints)."""
+    comp = (evento_ou_comp.get("competitions") or [{}])[0] if "competitions" in evento_ou_comp else evento_ou_comp
+    status = comp.get("status") or evento_ou_comp.get("status") or {}
+    tipo = status.get("type", {})
+    if tipo.get("completed") is True:
+        return True
+    if str(tipo.get("state", "")).lower() == "post":
+        return True
+    if str(tipo.get("name", "")).upper() in ("STATUS_FULL_TIME", "STATUS_FINAL"):
+        return True
+    return False
 
 
 def _stats_recentes_time(liga_codigo, time_id, ultimos_n=10):
@@ -128,10 +151,7 @@ def _stats_recentes_time(liga_codigo, time_id, ultimos_n=10):
         _CACHE_STATS_EXTRAS[chave_cache] = padrao
         return padrao
 
-    finalizados = [
-        e for e in eventos
-        if (e.get("competitions") or [{}])[0].get("status", {}).get("type", {}).get("completed")
-    ][-ultimos_n:]
+    finalizados = [e for e in eventos if _jogo_finalizado(e)][-ultimos_n:]
 
     gols_marcados, gols_sofridos, gols_1t = [], [], []
     escanteios_lista, cartoes_lista = [], []
@@ -144,13 +164,14 @@ def _stats_recentes_time(liga_codigo, time_id, ultimos_n=10):
         if not proprio or not adversario:
             continue
 
-        try:
-            gols_marcados.append(float(proprio.get("score", 0) or 0))
-            gols_sofridos.append(float(adversario.get("score", 0) or 0))
-        except (TypeError, ValueError):
+        gp = _extrair_valor_numerico(proprio.get("score"))
+        ga = _extrair_valor_numerico(adversario.get("score"))
+        if gp is None or ga is None:
             continue
+        gols_marcados.append(gp)
+        gols_sofridos.append(ga)
 
-        gols_1t_proprio = _extrair_gols_1o_tempo(proprio)
+        gols_1t_proprio = _extrair_valor_numerico(_extrair_gols_1o_tempo_bruto(proprio))
         if gols_1t_proprio is not None:
             gols_1t.append(gols_1t_proprio)
 
