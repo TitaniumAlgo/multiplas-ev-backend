@@ -64,76 +64,6 @@ def buscar_jogos_do_dia(liga_codigo, data_str):
     return jogos
 
 
-def _extrair_medias_da_entrada(entrada):
-    """De uma entrada da tabela (standings), pega jogos/gols pró/gols contra.
-    Busca de forma tolerante (ignora maiúscula/minúscula e aceita tanto
-    'name' quanto 'type'), porque a ESPN não é consistente na grafia
-    desses campos entre ligas."""
-    def _valor_por_apelidos(stats_lista, apelidos):
-        for s in stats_lista:
-            candidatos = [str(s.get("name") or "").lower(), str(s.get("type") or "").lower()]
-            if any(a in candidatos for a in apelidos):
-                valor = s.get("value")
-                if valor is not None:
-                    return float(valor)
-        return None
-
-    stats_lista = entrada.get("stats", [])
-    jogos = _valor_por_apelidos(stats_lista, ["gamesplayed"])
-    gols_pro = _valor_por_apelidos(stats_lista, ["pointsfor"])
-    gols_contra = _valor_por_apelidos(stats_lista, ["pointsagainst"])
-
-    # só usa os números se TODOS vieram e jogos é um valor plausível (>0);
-    # senão cai no chute conservador, em vez de gerar média absurda
-    if jogos and jogos > 0 and gols_pro is not None and gols_contra is not None:
-        return {
-            "jogos": jogos,
-            "gols_marcados_media": gols_pro / jogos,
-            "gols_sofridos_media": gols_contra / jogos,
-        }
-    return {"jogos": 0, "gols_marcados_media": 1.3, "gols_sofridos_media": 1.3}
-
-
-def buscar_medias_gols(liga_codigo, debug_info=None):
-    """Tabela de classificação -> média de gols marcados/sofridos por time."""
-    resp = requests.get(f"{ESPN_STANDINGS_BASE}/{liga_codigo}/standings", timeout=20)
-    resp.raise_for_status()
-    body = resp.json()
-
-    medias = {}
-    com_dados_reais = 0
-    no_fallback = 0
-    grupos = body.get("children") or [body]
-    for grupo in grupos:
-        standings = grupo.get("standings", {})
-        for entrada in standings.get("entries", []):
-            nome_time = entrada.get("team", {}).get("displayName")
-            if not nome_time:
-                continue
-            m = _extrair_medias_da_entrada(entrada)
-            medias[_normalizar(nome_time)] = m
-            if m["jogos"] > 0:
-                com_dados_reais += 1
-            else:
-                no_fallback += 1
-
-    if debug_info is not None:
-        debug_info.setdefault("times_com_dados_reais_por_liga", {})[liga_codigo] = com_dados_reais
-        debug_info.setdefault("times_no_fallback_por_liga", {})[liga_codigo] = no_fallback
-
-    return medias
-
-
-def _stats_do_time(nome_time, medias):
-    chave = _normalizar(nome_time)
-    if chave in medias:
-        return medias[chave]
-    for k, v in medias.items():
-        if _mesmo_time(k, chave):
-            return v
-    return {"gols_marcados_media": 1.3, "gols_sofridos_media": 1.3, "jogos": 0}
-
-
 def _extrair_escanteios_cartoes(fixture_evento):
     """De um evento (scoreboard/summary), extrai escanteios e cartões de cada time."""
     comp = (fixture_evento.get("competitions") or [{}])[0]
@@ -162,14 +92,34 @@ def _extrair_escanteios_cartoes(fixture_evento):
     return resultado
 
 
-def _media_escanteios_cartoes_time(liga_codigo, time_id, ultimos_n=4):
-    """Busca os últimos jogos do time (via schedule) e calcula médias de
-    escanteios/cartões. Cacheado por liga+time pra não repetir chamadas."""
+def _extrair_gols_1o_tempo(competidor):
+    """Pega o placar do intervalo (1º período) de um competidor, se disponível."""
+    linescores = competidor.get("linescores") or []
+    if not linescores:
+        return None
+    primeiro = linescores[0]
+    valor = primeiro.get("value") if isinstance(primeiro, dict) else None
+    try:
+        return float(valor) if valor is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _stats_recentes_time(liga_codigo, time_id, ultimos_n=10):
+    """Busca os últimos N jogos do time e calcula, tudo numa única
+    chamada: média de gols (jogo inteiro e 1º tempo), escanteios e
+    cartões. Usa forma recente em vez da temporada inteira - reflete
+    melhor o momento atual do time. Cacheado por liga+time."""
     chave_cache = (liga_codigo, time_id)
     if chave_cache in _CACHE_STATS_EXTRAS:
         return _CACHE_STATS_EXTRAS[chave_cache]
 
-    padrao = {"escanteios_media": 9.5, "cartoes_media": 3.5}  # chute conservador se não achar nada
+    padrao = {
+        "gols_marcados_media": 1.3, "gols_sofridos_media": 1.3,
+        "gols_1t_media": 0.55,
+        "escanteios_media": 5.0, "cartoes_media": 1.8,
+        "jogos_analisados": 0,
+    }
     try:
         resp = requests.get(f"{ESPN_BASE}/{liga_codigo}/teams/{time_id}/schedule", timeout=20)
         resp.raise_for_status()
@@ -183,17 +133,43 @@ def _media_escanteios_cartoes_time(liga_codigo, time_id, ultimos_n=4):
         if (e.get("competitions") or [{}])[0].get("status", {}).get("type", {}).get("completed")
     ][-ultimos_n:]
 
+    gols_marcados, gols_sofridos, gols_1t = [], [], []
     escanteios_lista, cartoes_lista = [], []
+
     for ev in finalizados:
+        comp = (ev.get("competitions") or [{}])[0]
+        competidores = comp.get("competitors", [])
+        proprio = next((c for c in competidores if str(c.get("team", {}).get("id")) == str(time_id)), None)
+        adversario = next((c for c in competidores if str(c.get("team", {}).get("id")) != str(time_id)), None)
+        if not proprio or not adversario:
+            continue
+
+        try:
+            gols_marcados.append(float(proprio.get("score", 0) or 0))
+            gols_sofridos.append(float(adversario.get("score", 0) or 0))
+        except (TypeError, ValueError):
+            continue
+
+        gols_1t_proprio = _extrair_gols_1o_tempo(proprio)
+        if gols_1t_proprio is not None:
+            gols_1t.append(gols_1t_proprio)
+
         extras = _extrair_escanteios_cartoes(ev)
         dados_time = extras.get(str(time_id)) or extras.get(time_id)
         if dados_time:
             escanteios_lista.append(dados_time["escanteios"])
             cartoes_lista.append(dados_time["cartoes"])
 
+    def _media(lista, padrao_valor):
+        return (sum(lista) / len(lista)) if lista else padrao_valor
+
     resultado = {
-        "escanteios_media": (sum(escanteios_lista) / len(escanteios_lista)) if escanteios_lista else padrao["escanteios_media"],
-        "cartoes_media": (sum(cartoes_lista) / len(cartoes_lista)) if cartoes_lista else padrao["cartoes_media"],
+        "gols_marcados_media": _media(gols_marcados, padrao["gols_marcados_media"]),
+        "gols_sofridos_media": _media(gols_sofridos, padrao["gols_sofridos_media"]),
+        "gols_1t_media": _media(gols_1t, padrao["gols_1t_media"]),
+        "escanteios_media": _media(escanteios_lista, padrao["escanteios_media"]),
+        "cartoes_media": _media(cartoes_lista, padrao["cartoes_media"]),
+        "jogos_analisados": len(gols_marcados),
     }
     _CACHE_STATS_EXTRAS[chave_cache] = resultado
     return resultado
@@ -223,7 +199,6 @@ def gerar_selecoes(data_str=None, prob_minima=0.5, incluir_escanteios_cartoes=Tr
     selecoes = []
     for liga_codigo, liga_nome in LIGAS.items():
         try:
-            medias_gols = buscar_medias_gols(liga_codigo, debug_info=debug_info)
             jogos = buscar_jogos_do_dia(liga_codigo, data_str)
         except Exception as exc:
             if debug_info is not None:
@@ -231,8 +206,18 @@ def gerar_selecoes(data_str=None, prob_minima=0.5, incluir_escanteios_cartoes=Tr
             continue
 
         for jogo in jogos:
-            stats_casa = _stats_do_time(jogo["nome_casa"], medias_gols)
-            stats_fora = _stats_do_time(jogo["nome_fora"], medias_gols)
+            try:
+                stats_casa = _stats_recentes_time(liga_codigo, jogo["id_casa"])
+                stats_fora = _stats_recentes_time(liga_codigo, jogo["id_fora"])
+            except Exception as exc:
+                if debug_info is not None:
+                    debug_info.setdefault("erros_stats", []).append(f"{jogo['nome_casa']} x {jogo['nome_fora']}: {exc}")
+                continue
+
+            if debug_info is not None:
+                debug_info.setdefault("jogos_analisados_por_time", {})[jogo["nome_casa"]] = stats_casa["jogos_analisados"]
+                debug_info.setdefault("jogos_analisados_por_time", {})[jogo["nome_fora"]] = stats_fora["jogos_analisados"]
+
             gc, gf = expected_goals(stats_casa, stats_fora)
             probs_gols = calcular_probabilidades(gc, gf)
             nome_jogo = f"{jogo['nome_casa']} x {jogo['nome_fora']}"
@@ -251,13 +236,22 @@ def gerar_selecoes(data_str=None, prob_minima=0.5, incluir_escanteios_cartoes=Tr
                 if prob is not None and prob >= prob_minima:
                     selecoes.append({"jogo": nome_jogo, "mercado": nome_mercado, "prob_real": round(prob, 4), "liga": liga_nome})
 
+            # gols no 1º tempo (linha única: mais/menos de 0,5)
+            try:
+                media_1t = stats_casa["gols_1t_media"] + stats_fora["gols_1t_media"]
+                probs_1t = _poisson_over_under(media_1t, [0.5])
+                for nome_mercado, prob in probs_1t.items():
+                    prob = _limitar_prob(prob)
+                    rotulo = f"{nome_mercado} gols no 1º tempo"
+                    if prob >= prob_minima:
+                        selecoes.append({"jogo": nome_jogo, "mercado": rotulo, "prob_real": round(prob, 4), "liga": liga_nome})
+            except Exception:
+                pass
+
             if incluir_escanteios_cartoes:
                 try:
-                    extra_casa = _media_escanteios_cartoes_time(liga_codigo, jogo["id_casa"])
-                    extra_fora = _media_escanteios_cartoes_time(liga_codigo, jogo["id_fora"])
-
-                    media_escanteios = extra_casa["escanteios_media"] + extra_fora["escanteios_media"]
-                    media_cartoes = extra_casa["cartoes_media"] + extra_fora["cartoes_media"]
+                    media_escanteios = stats_casa["escanteios_media"] + stats_fora["escanteios_media"]
+                    media_cartoes = stats_casa["cartoes_media"] + stats_fora["cartoes_media"]
 
                     probs_escanteios = _poisson_over_under(media_escanteios, [9.5])
                     probs_cartoes = _poisson_over_under(media_cartoes, [3.5])
