@@ -458,7 +458,9 @@ def datas_disponiveis():
 
 @app.route("/")
 def home():
-    return app.send_static_file("index.html")
+    resp = app.send_static_file("index.html")
+    resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    return resp
 
 
 @app.route("/api/health")
