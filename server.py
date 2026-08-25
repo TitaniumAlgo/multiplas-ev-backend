@@ -344,6 +344,7 @@ def api_espn_multiplas():
         "data": data_str,
         "aviso": "Modo sem odds reais (ESPN, dados públicos) - probabilidade calculada, não valor de mercado",
         "total_selecoes": len(selecoes),
+        "selecoes": selecoes,
         "combinacoes_por_faixa": combinacoes_por_faixa,
         "debug": debug_info,
     })
