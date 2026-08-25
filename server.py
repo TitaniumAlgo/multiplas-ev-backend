@@ -307,6 +307,7 @@ def api_espn_multiplas():
                         "odd_estimada": i["odd_estimada"],
                         "lucro": i["lucro"],
                         "selecoes": i["selecoes"],
+                        "selecoes_resultado": i["selecoes_resultado"],
                         "id": i["id"],
                         "resultado": i["resultado"],
                     }
