@@ -283,7 +283,17 @@ def montar_combinacoes_por_faixa(selecoes, faixas=(0.5, 0.6, 0.7, 0.8, 0.9), min
     em vez de repetir as mesmas em todas as faixas superiores."""
     from itertools import combinations
 
-    elegveis = [s for s in selecoes if s["prob_real"] >= faixas[0]]
+    elegveis_brutos = [s for s in selecoes if s["prob_real"] >= faixas[0]]
+
+    # no máximo 1 seleção por jogo (a de maior probabilidade) - evita gerar
+    # várias múltiplas quase-idênticas só trocando o mercado de um mesmo jogo
+    melhor_por_jogo = {}
+    for s in elegveis_brutos:
+        atual = melhor_por_jogo.get(s["jogo"])
+        if atual is None or s["prob_real"] > atual["prob_real"]:
+            melhor_por_jogo[s["jogo"]] = s
+    elegveis = list(melhor_por_jogo.values())
+
     combinacoes_geradas = []
     for n in range(min_selecoes, min(max_selecoes, len(elegveis)) + 1):
         for combo in combinations(elegveis, n):
