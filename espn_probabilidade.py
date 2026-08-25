@@ -292,29 +292,29 @@ def gerar_selecoes(data_str=None, prob_minima=0.5, incluir_escanteios_cartoes=Tr
 def montar_combinacoes_por_faixa(selecoes, faixas=(0.5, 0.6, 0.7, 0.8, 0.9), min_selecoes=2, max_selecoes=4):
     """Agrupa combinações de pelo menos 2 seleções por faixa de probabilidade.
 
-    Cada combinação aparece em UMA ÚNICA faixa - a que corresponde à sua
-    perna mais fraca (a que "segura" a confiança da múltipla inteira).
-    Assim, 50%/60%/70%/80%/90% mostram conjuntos DIFERENTES de múltiplas,
-    em vez de repetir as mesmas em todas as faixas superiores."""
+    Gera combinações usando TODAS as seleções qualificadas (sem descartar
+    mercados alternativos do mesmo jogo de antemão), e depois, pra cada
+    CONJUNTO de jogos envolvido, mantém só a MELHOR combinação (a que tem
+    a odd mais alta que ainda bate o piso mínimo) - assim não aparece
+    "a mesma múltipla trocando 1 mercado" repetida, e o algoritmo escolhe
+    o mercado de cada jogo que realmente ajuda a odd compensar, em vez de
+    sempre pegar o de maior probabilidade isolada (que tende a virar odd
+    baixa demais quando combinado).
+
+    Cada combinação (já filtrada/única por conjunto de jogos) aparece em
+    UMA ÚNICA faixa - a que corresponde à sua perna mais fraca."""
     from itertools import combinations
 
-    elegveis_brutos = [s for s in selecoes if s["prob_real"] >= faixas[0]]
+    ODD_MINIMA_ACEITAVEL = 1.3  # abaixo disso, o retorno não compensa o risco
 
-    # no máximo 1 seleção por jogo (a de maior probabilidade) - evita gerar
-    # várias múltiplas quase-idênticas só trocando o mercado de um mesmo jogo
-    melhor_por_jogo = {}
-    for s in elegveis_brutos:
-        atual = melhor_por_jogo.get(s["jogo"])
-        if atual is None or s["prob_real"] > atual["prob_real"]:
-            melhor_por_jogo[s["jogo"]] = s
-    elegveis = list(melhor_por_jogo.values())
+    elegveis = [s for s in selecoes if s["prob_real"] >= faixas[0]]
 
     combinacoes_geradas = []
     for n in range(min_selecoes, min(max_selecoes, len(elegveis)) + 1):
         for combo in combinations(elegveis, n):
             jogos = [s["jogo"] for s in combo]
             if len(set(jogos)) != n:
-                continue
+                continue  # não repete o mesmo jogo na mesma múltipla
             prob_final = 1.0
             perna_mais_fraca = 1.0
             for s in combo:
@@ -325,24 +325,41 @@ def montar_combinacoes_por_faixa(selecoes, faixas=(0.5, 0.6, 0.7, 0.8, 0.9), min
                 "prob_final": round(prob_final, 4),
                 "perna_mais_fraca": perna_mais_fraca,
                 "odd_estimada": round(1 / max(prob_final, 0.03), 2),
+                "conjunto_jogos": frozenset(jogos),
             })
 
+    # pra cada conjunto de jogos, mantém só a melhor combinação: prioriza
+    # as que batem o piso de odd, e entre essas, a de maior probabilidade
+    # (mais segura); se nenhuma bate o piso, guarda a de maior odd mesmo
+    # assim, pra não sumir sem explicação
+    melhor_por_conjunto = {}
+    for c in combinacoes_geradas:
+        chave = c["conjunto_jogos"]
+        atual = melhor_por_conjunto.get(chave)
+        if atual is None:
+            melhor_por_conjunto[chave] = c
+            continue
+        c_compensa = c["odd_estimada"] >= ODD_MINIMA_ACEITAVEL
+        atual_compensa = atual["odd_estimada"] >= ODD_MINIMA_ACEITAVEL
+        if c_compensa and not atual_compensa:
+            melhor_por_conjunto[chave] = c
+        elif c_compensa == atual_compensa and c["prob_final"] > atual["prob_final"]:
+            melhor_por_conjunto[chave] = c
+
+    combinacoes_finais = [c for c in melhor_por_conjunto.values() if c["odd_estimada"] >= ODD_MINIMA_ACEITAVEL]
+
     def _faixa_da_combinacao(perna_mais_fraca):
-        # acha a maior faixa que a perna mais fraca ainda atinge
         faixa_certa = faixas[0]
         for f in faixas:
             if perna_mais_fraca >= f:
                 faixa_certa = f
         return faixa_certa
 
-    ODD_MINIMA_ACEITAVEL = 1.3  # abaixo disso, o retorno não compensa o risco
-
     resultado = {f"{int(f*100)}%": [] for f in faixas}
-    for combo in combinacoes_geradas:
-        if combo["odd_estimada"] < ODD_MINIMA_ACEITAVEL:
-            continue  # descarta - odd baixa demais, não compensa
+    for combo in combinacoes_finais:
         faixa = _faixa_da_combinacao(combo["perna_mais_fraca"])
-        resultado[f"{int(faixa*100)}%"].append(combo)
+        combo_limpo = {k: v for k, v in combo.items() if k != "conjunto_jogos"}
+        resultado[f"{int(faixa*100)}%"].append(combo_limpo)
 
     for chave in resultado:
         resultado[chave].sort(key=lambda c: c["prob_final"], reverse=True)
