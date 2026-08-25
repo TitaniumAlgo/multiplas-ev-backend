@@ -49,6 +49,10 @@ def iniciar_banco():
             criado_em TEXT NOT NULL
         )
     """)
+    try:
+        conn.execute("ALTER TABLE historico_prob ADD COLUMN selecoes_resultado_json TEXT")
+    except sqlite3.OperationalError:
+        pass  # coluna já existe
     conn.commit()
     conn.close()
 
@@ -98,6 +102,14 @@ def listar_historico(semana=None):
 
 
 def _linha_para_dict(r):
+    selecoes_resultado = None
+    try:
+        bruto = r["selecoes_resultado_json"]
+        if bruto:
+            selecoes_resultado = json.loads(bruto)
+    except (KeyError, IndexError):
+        pass  # coluna pode não existir em bancos bem antigos ainda não migrados
+
     return {
         "id": r["id"],
         "data_jogo": r["data_jogo"],
@@ -106,15 +118,24 @@ def _linha_para_dict(r):
         "odd_estimada": _odd_estimada(r["prob_final"]),
         "lucro": _lucro_simulado(r["prob_final"], r["resultado"]),
         "selecoes": json.loads(r["selecoes_json"]),
+        "selecoes_resultado": selecoes_resultado,
         "resultado": r["resultado"],
     }
 
 
-def marcar_resultado(item_id, resultado):
+def marcar_resultado(item_id, resultado, selecoes_resultado=None):
+    """selecoes_resultado: lista opcional de True/False/None, uma por
+    perna da múltipla, na mesma ordem das seleções salvas."""
     if resultado not in ("ganhou", "perdeu", "pendente"):
         raise ValueError("resultado inválido")
     conn = _conectar()
-    conn.execute("UPDATE historico_prob SET resultado = ? WHERE id = ?", (resultado, item_id))
+    if selecoes_resultado is not None:
+        conn.execute(
+            "UPDATE historico_prob SET resultado = ?, selecoes_resultado_json = ? WHERE id = ?",
+            (resultado, json.dumps(selecoes_resultado), item_id),
+        )
+    else:
+        conn.execute("UPDATE historico_prob SET resultado = ? WHERE id = ?", (resultado, item_id))
     conn.commit()
     conn.close()
 
