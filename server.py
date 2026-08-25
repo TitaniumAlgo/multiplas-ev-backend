@@ -41,6 +41,16 @@ historico.iniciar_banco()
 historico_prob.iniciar_banco()
 
 
+@app.after_request
+def _sem_cache_nas_apis(response):
+    # o navegador (principalmente no celular) às vezes guarda em cache as
+    # respostas de /api/*, mostrando dados velhos mesmo depois de corrigir
+    # o servidor. Isso força sempre buscar de novo.
+    if request.path.startswith("/api/"):
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+    return response
+
+
 @app.route("/api/multiplas")
 def api_multiplas():
     """
