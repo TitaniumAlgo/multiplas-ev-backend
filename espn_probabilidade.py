@@ -335,7 +335,7 @@ def montar_combinacoes_por_faixa(selecoes, faixas=(0.5, 0.6, 0.7, 0.8, 0.9), min
                 faixa_certa = f
         return faixa_certa
 
-    ODD_MINIMA_ACEITAVEL = 1.4  # abaixo disso, o retorno não compensa o risco
+    ODD_MINIMA_ACEITAVEL = 1.3  # abaixo disso, o retorno não compensa o risco
 
     resultado = {f"{int(f*100)}%": [] for f in faixas}
     for combo in combinacoes_geradas:
