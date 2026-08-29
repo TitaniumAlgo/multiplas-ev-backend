@@ -456,7 +456,12 @@ async function buscar() {
 
   try {
     const resp = await fetch(`/api/espn-multiplas?data=${dataEscolhida}`);
-    const data = await resp.json();
+    let data;
+    try {
+      data = await resp.json();
+    } catch (erroParse) {
+      throw new Error("O servidor travou ou demorou demais pra responder (provavelmente memória ou timeout no Render). Tenta de novo em alguns segundos.");
+    }
     if (!resp.ok) throw new Error(data.erro || "Erro ao buscar.");
     ultimoResultado = data;
 
