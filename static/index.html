@@ -301,7 +301,7 @@
   <div class="marca">
     <div>
       <div class="marca-titulo">MÚLTIPLAS <span class="accent">·</span> PROB</div>
-      <div class="marca-sub">Brasileirão A &amp; B — probabilidade real</div>
+      <div class="marca-sub">Principais ligas do mundo — probabilidade real</div>
     </div>
     <button class="btn-hist" id="btnHistorico">Histórico</button>
   </div>
@@ -452,13 +452,25 @@ function renderResultadoAtual() {
 
 async function buscar() {
   const cont = document.getElementById("resultado");
-  cont.innerHTML = `<div class="idle"><div class="icone spin">⏳</div>Buscando na ESPN (Série A + B)...<br>pode levar até 1 minuto na primeira vez do dia.</div>`;
+  cont.innerHTML = `<div class="idle"><div class="icone spin">⏳</div>Buscando na ESPN (todas as ligas)...<br>pode levar até 1-2 minutos na primeira vez do dia.</div>`;
 
   try {
     const resp = await fetch(`/api/espn-multiplas?data=${dataEscolhida}`);
     const data = await resp.json();
     if (!resp.ok) throw new Error(data.erro || "Erro ao buscar.");
     ultimoResultado = data;
+
+    // se a faixa atual estiver vazia, pula automaticamente pra primeira
+    // faixa que tiver alguma múltipla, em vez de mostrar "vazio" à toa
+    const faixaAtualVazia = !(data.combinacoes_por_faixa && data.combinacoes_por_faixa[faixaEscolhida] && data.combinacoes_por_faixa[faixaEscolhida].length);
+    if (faixaAtualVazia) {
+      const faixaComConteudo = FAIXAS.find(f => data.combinacoes_por_faixa && data.combinacoes_por_faixa[f] && data.combinacoes_por_faixa[f].length);
+      if (faixaComConteudo) {
+        faixaEscolhida = faixaComConteudo;
+        montarFaixas();
+      }
+    }
+
     renderResultadoAtual();
   } catch (e) {
     cont.innerHTML = `<div class="aviso" style="border-left-color:var(--danger);"><span>⚠️</span><div>${e.message}</div></div>`;
