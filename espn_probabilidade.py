@@ -409,8 +409,22 @@ def montar_combinacoes_por_faixa(selecoes, faixas=(0.5, 0.6, 0.7, 0.8, 0.9), min
         combo_limpo = {k: v for k, v in combo.items() if k != "conjunto_jogos"}
         resultado[f"{int(faixa*100)}%"].append(combo_limpo)
 
+    # ordena por probabilidade e, dentro de cada faixa, só aceita uma
+    # múltipla se NENHUM dos jogos dela já apareceu em outra múltipla
+    # mostrada nessa mesma faixa - isso elimina de vez o padrão de "mesmo
+    # jogo âncora repetido em quase toda combinação, só trocando o parceiro"
     for chave in resultado:
         resultado[chave].sort(key=lambda c: c["prob_final"], reverse=True)
-        resultado[chave] = resultado[chave][:10]  # top 10 por faixa
+        selecionadas = []
+        jogos_usados = set()
+        for combo in resultado[chave]:
+            jogos_do_combo = {s["jogo"] for s in combo["selecoes"]}
+            if jogos_do_combo & jogos_usados:
+                continue  # algum jogo daqui já está em outra múltipla mostrada
+            selecionadas.append(combo)
+            jogos_usados |= jogos_do_combo
+            if len(selecionadas) >= 6:
+                break
+        resultado[chave] = selecionadas
 
     return resultado
