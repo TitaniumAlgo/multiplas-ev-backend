@@ -9,6 +9,7 @@ igual ao modo Série B, mas agora cobrindo mais mercados e as duas séries.
 """
 
 import unicodedata
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date
 
 import requests
@@ -17,7 +18,21 @@ from multiplas_ev import expected_goals, calcular_probabilidades
 
 ESPN_BASE = "https://site.api.espn.com/apis/site/v2/sports/soccer"
 ESPN_STANDINGS_BASE = "https://site.api.espn.com/apis/v2/sports/soccer"
-LIGAS = {"bra.1": "Brasileirão Série A", "bra.2": "Brasileirão Série B"}
+LIGAS = {
+    "bra.1": "Brasileirão Série A",
+    "bra.2": "Brasileirão Série B",
+    "eng.1": "Premier League",
+    "esp.1": "La Liga",
+    "ita.1": "Serie A (Itália)",
+    "ger.1": "Bundesliga",
+    "fra.1": "Ligue 1",
+    "usa.1": "MLS",
+    "mex.1": "Liga MX",
+    "arg.1": "Liga Argentina",
+    "por.1": "Primeira Liga",
+    "ned.1": "Eredivisie",
+    "conmebol.libertadores": "Libertadores",
+}
 
 _CACHE_STATS_EXTRAS = {}  # (liga, team_id) -> {"escanteios": x, "cartoes": y} (por jogo)
 
@@ -217,15 +232,36 @@ def gerar_selecoes(data_str=None, prob_minima=0.5, incluir_escanteios_cartoes=Tr
     if data_str is None:
         data_str = date.today().isoformat()
 
-    selecoes = []
+    # 1) busca os jogos do dia em todas as ligas primeiro
+    jogos_por_liga = {}
     for liga_codigo, liga_nome in LIGAS.items():
         try:
-            jogos = buscar_jogos_do_dia(liga_codigo, data_str)
+            jogos_por_liga[liga_codigo] = buscar_jogos_do_dia(liga_codigo, data_str)
         except Exception as exc:
             if debug_info is not None:
                 debug_info.setdefault("erros_por_liga", {})[liga_nome] = str(exc)
-            continue
 
+    # 2) busca a estatística de TODOS os times envolvidos em paralelo,
+    # em vez de um de cada vez - com muitas ligas, isso evita demorar
+    # minutos numa única busca
+    pares_time_liga = set()
+    for liga_codigo, jogos in jogos_por_liga.items():
+        for jogo in jogos:
+            pares_time_liga.add((liga_codigo, jogo["id_casa"]))
+            pares_time_liga.add((liga_codigo, jogo["id_fora"]))
+
+    with ThreadPoolExecutor(max_workers=12) as executor:
+        futuros = {
+            executor.submit(_stats_recentes_time, liga_codigo, time_id): (liga_codigo, time_id)
+            for liga_codigo, time_id in pares_time_liga
+        }
+        for futuro in as_completed(futuros):
+            futuro.result()  # só espera terminar - já fica salvo no cache interno
+
+    # 3) agora monta as seleções usando o cache já preenchido (rápido, sem rede)
+    selecoes = []
+    for liga_codigo, liga_nome in LIGAS.items():
+        jogos = jogos_por_liga.get(liga_codigo, [])
         for jogo in jogos:
             try:
                 stats_casa = _stats_recentes_time(liga_codigo, jogo["id_casa"])
