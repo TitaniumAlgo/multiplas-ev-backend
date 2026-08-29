@@ -25,16 +25,20 @@ LIGAS = {
     "esp.1": "La Liga",
     "ita.1": "Serie A (Itália)",
     "ger.1": "Bundesliga",
-    "fra.1": "Ligue 1",
-    "usa.1": "MLS",
     "mex.1": "Liga MX",
-    "arg.1": "Liga Argentina",
-    "por.1": "Primeira Liga",
-    "ned.1": "Eredivisie",
     "conmebol.libertadores": "Libertadores",
 }
 
-_CACHE_STATS_EXTRAS = {}  # (liga, team_id) -> {"escanteios": x, "cartoes": y} (por jogo)
+_CACHE_STATS_EXTRAS = {}  # (liga, team_id) -> stats do time (limitado em tamanho, ver _guardar_no_cache)
+_CACHE_TAMANHO_MAXIMO = 300  # evita crescer pra sempre e vazar memória ao longo do tempo
+
+
+def _guardar_no_cache(chave, valor):
+    if len(_CACHE_STATS_EXTRAS) >= _CACHE_TAMANHO_MAXIMO:
+        # remove uma entrada qualquer (a mais antiga por ordem de inserção)
+        mais_antiga = next(iter(_CACHE_STATS_EXTRAS))
+        del _CACHE_STATS_EXTRAS[mais_antiga]
+    _CACHE_STATS_EXTRAS[chave] = valor
 
 
 def disponivel():
@@ -163,7 +167,7 @@ def _stats_recentes_time(liga_codigo, time_id, ultimos_n=10):
         resp.raise_for_status()
         eventos = resp.json().get("events", [])
     except Exception:
-        _CACHE_STATS_EXTRAS[chave_cache] = padrao
+        _guardar_no_cache(chave_cache, padrao)
         return padrao
 
     finalizados = [e for e in eventos if _jogo_finalizado(e)][-ultimos_n:]
@@ -207,7 +211,7 @@ def _stats_recentes_time(liga_codigo, time_id, ultimos_n=10):
         "cartoes_media": _media(cartoes_lista, padrao["cartoes_media"]),
         "jogos_analisados": len(gols_marcados),
     }
-    _CACHE_STATS_EXTRAS[chave_cache] = resultado
+    _guardar_no_cache(chave_cache, resultado)
     return resultado
 
 
@@ -250,7 +254,7 @@ def gerar_selecoes(data_str=None, prob_minima=0.5, incluir_escanteios_cartoes=Tr
             pares_time_liga.add((liga_codigo, jogo["id_casa"]))
             pares_time_liga.add((liga_codigo, jogo["id_fora"]))
 
-    with ThreadPoolExecutor(max_workers=12) as executor:
+    with ThreadPoolExecutor(max_workers=6) as executor:
         futuros = {
             executor.submit(_stats_recentes_time, liga_codigo, time_id): (liga_codigo, time_id)
             for liga_codigo, time_id in pares_time_liga
