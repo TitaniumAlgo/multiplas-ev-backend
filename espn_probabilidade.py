@@ -385,6 +385,17 @@ def montar_combinacoes_por_faixa(selecoes, faixas=(0.5, 0.6, 0.7, 0.8, 0.9), min
 
     combinacoes_finais = [c for c in melhor_por_conjunto.values() if c["odd_estimada"] >= ODD_MINIMA_ACEITAVEL]
 
+    # remove duplicatas "econômicas": combos com a mesma odd final são a
+    # mesma oportunidade na prática (ex: trocar só QUAL jogo fornece o
+    # escanteio de "menos de 9,5", que dá ~97% em quase todo jogo, gera
+    # dezenas de combos tecnicamente diferentes mas sem variedade real)
+    vistos_por_odd = {}
+    for c in sorted(combinacoes_finais, key=lambda x: x["prob_final"], reverse=True):
+        chave_odd = round(c["odd_estimada"], 2)
+        if chave_odd not in vistos_por_odd:
+            vistos_por_odd[chave_odd] = c
+    combinacoes_finais = list(vistos_por_odd.values())
+
     def _faixa_da_combinacao(perna_mais_fraca):
         faixa_certa = faixas[0]
         for f in faixas:
