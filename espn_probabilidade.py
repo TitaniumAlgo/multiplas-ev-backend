@@ -23,9 +23,6 @@ LIGAS = {
     "bra.2": "Brasileirão Série B",
     "eng.1": "Premier League",
     "esp.1": "La Liga",
-    "ita.1": "Serie A (Itália)",
-    "ger.1": "Bundesliga",
-    "mex.1": "Liga MX",
     "conmebol.libertadores": "Libertadores",
 }
 
