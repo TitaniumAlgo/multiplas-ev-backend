@@ -492,7 +492,12 @@ async function renderHistorico() {
 
   try {
     const resp = await fetch("/api/historico-prob");
-    const data = await resp.json();
+    let data;
+    try {
+      data = await resp.json();
+    } catch (erroParse) {
+      throw new Error("O servidor travou ou demorou demais pra responder. Tenta de novo em alguns segundos.");
+    }
 
     let html = "";
     if (data.semanas && data.semanas.length > 0) {
@@ -525,7 +530,7 @@ async function renderHistorico() {
 
     cont.innerHTML = html;
   } catch (e) {
-    cont.innerHTML = `<div class="aviso" style="border-left-color:var(--danger);"><span>⚠️</span><div>Não foi possível carregar o histórico.</div></div>`;
+    cont.innerHTML = `<div class="aviso" style="border-left-color:var(--danger);"><span>⚠️</span><div>${e.message || "Não foi possível carregar o histórico."}</div></div>`;
   }
 }
 
