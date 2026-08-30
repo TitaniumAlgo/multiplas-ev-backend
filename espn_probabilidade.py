@@ -22,8 +22,6 @@ LIGAS = {
     "bra.1": "Brasileirão Série A",
     "bra.2": "Brasileirão Série B",
     "eng.1": "Premier League",
-    "esp.1": "La Liga",
-    "conmebol.libertadores": "Libertadores",
 }
 
 _CACHE_STATS_EXTRAS = {}  # (liga, team_id) -> stats do time (limitado em tamanho, ver _guardar_no_cache)
@@ -81,18 +79,27 @@ def buscar_jogos_do_dia(liga_codigo, data_str):
 
 
 def _extrair_escanteios_cartoes(fixture_evento):
-    """De um evento (scoreboard/summary), extrai escanteios e cartões de cada time."""
+    """De um evento (scoreboard/summary), extrai escanteios e cartões de
+    cada time. Se a estatística não estiver disponível nesse evento
+    (comum no endpoint de 'schedule', mais leve que o de resultado
+    completo), devolve None em vez de 0 - um 0 falso puxaria a média
+    pra baixo e faria qualquer linha parecer 'quase certa' por engano."""
     comp = (fixture_evento.get("competitions") or [{}])[0]
     resultado = {}
     for competidor in comp.get("competitors", []):
         time_id = competidor.get("team", {}).get("id")
-        stats = {s.get("name"): s.get("displayValue") for s in competidor.get("statistics", [])}
-        try:
-            corners = float(stats.get("wonCorners", 0) or 0)
-        except (TypeError, ValueError):
-            corners = 0
+        stats_lista = competidor.get("statistics", [])
+        stats = {s.get("name"): s.get("displayValue") for s in stats_lista}
+        if "wonCorners" in stats:
+            try:
+                corners = float(stats["wonCorners"])
+            except (TypeError, ValueError):
+                corners = None
+        else:
+            corners = None  # estatística não veio nesse evento - não é zero real
         resultado[time_id] = {"escanteios": corners}
 
+    tem_detalhes = "details" in comp
     cartoes_por_time = {}
     for detalhe in comp.get("details", []):
         tipo_texto = (detalhe.get("type", {}) or {}).get("text", "")
@@ -103,7 +110,7 @@ def _extrair_escanteios_cartoes(fixture_evento):
             cartoes_por_time[time_id] = cartoes_por_time.get(time_id, 0) + 1
 
     for time_id in resultado:
-        resultado[time_id]["cartoes"] = cartoes_por_time.get(time_id, 0)
+        resultado[time_id]["cartoes"] = cartoes_por_time.get(time_id, 0) if tem_detalhes else None
 
     return resultado
 
@@ -194,8 +201,10 @@ def _stats_recentes_time(liga_codigo, time_id, ultimos_n=10):
         extras = _extrair_escanteios_cartoes(ev)
         dados_time = extras.get(str(time_id)) or extras.get(time_id)
         if dados_time:
-            escanteios_lista.append(dados_time["escanteios"])
-            cartoes_lista.append(dados_time["cartoes"])
+            if dados_time["escanteios"] is not None:
+                escanteios_lista.append(dados_time["escanteios"])
+            if dados_time["cartoes"] is not None:
+                cartoes_lista.append(dados_time["cartoes"])
 
     def _media(lista, padrao_valor):
         return (sum(lista) / len(lista)) if lista else padrao_valor
@@ -251,7 +260,7 @@ def gerar_selecoes(data_str=None, prob_minima=0.5, incluir_escanteios_cartoes=Tr
             pares_time_liga.add((liga_codigo, jogo["id_casa"]))
             pares_time_liga.add((liga_codigo, jogo["id_fora"]))
 
-    with ThreadPoolExecutor(max_workers=6) as executor:
+    with ThreadPoolExecutor(max_workers=3) as executor:
         futuros = {
             executor.submit(_stats_recentes_time, liga_codigo, time_id): (liga_codigo, time_id)
             for liga_codigo, time_id in pares_time_liga
