@@ -54,6 +54,20 @@ def _limitar_prob(p):
     return max(0.01, min(0.97, p))
 
 
+def _jogo_ainda_nao_comecou(evento):
+    """Só interessa pra gerar seleção um jogo que ainda vai acontecer -
+    um jogo já finalizado ou em andamento não é mais uma aposta válida."""
+    comp = (evento.get("competitions") or [{}])[0]
+    status = comp.get("status") or evento.get("status") or {}
+    tipo = status.get("type", {})
+    estado = str(tipo.get("state", "")).lower()
+    if estado:
+        return estado == "pre"
+    # sem campo 'state' reconhecível - usa o mesmo critério de "finalizado"
+    # que já temos, e assume que não-finalizado = ainda não começou
+    return not _jogo_finalizado(evento)
+
+
 def buscar_jogos_do_dia(liga_codigo, data_str):
     params = {"dates": data_str.replace("-", "")} if data_str else {}
     resp = requests.get(f"{ESPN_BASE}/{liga_codigo}/scoreboard", params=params, timeout=20)
@@ -62,6 +76,8 @@ def buscar_jogos_do_dia(liga_codigo, data_str):
 
     jogos = []
     for ev in eventos:
+        if not _jogo_ainda_nao_comecou(ev):
+            continue
         comp = (ev.get("competitions") or [{}])[0]
         competidores = comp.get("competitors", [])
         casa = next((c for c in competidores if c.get("homeAway") == "home"), None)
