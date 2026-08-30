@@ -343,6 +343,7 @@ def api_espn_multiplas():
         return jsonify({"erro": str(exc), "debug": debug_info}), 502
 
     combinacoes_por_faixa = espn_probabilidade.montar_combinacoes_por_faixa(selecoes, min_selecoes=2, max_selecoes=3)
+    multipla_grande_progressao = espn_probabilidade.montar_multipla_grande(selecoes, max_pernas=10)
 
     for faixa, combos in combinacoes_por_faixa.items():
         try:
@@ -350,12 +351,26 @@ def api_espn_multiplas():
         except Exception:
             pass
 
+    try:
+        # salva só a maior versão da múltipla grande (10 pernas, ou o
+        # máximo disponível) - as menores são subconjuntos dela mesma
+        if multipla_grande_progressao:
+            maior = multipla_grande_progressao[-1]
+            historico_prob.salvar_combinacoes(
+                data_str,
+                [{"prob_final": maior["prob_final"], "selecoes": maior["selecoes"]}],
+                tipo_mercado="espn_multipla_grande",
+            )
+    except Exception:
+        pass
+
     return jsonify({
         "data": data_str,
         "aviso": "Modo sem odds reais (ESPN, dados públicos) - probabilidade calculada, não valor de mercado",
         "total_selecoes": len(selecoes),
         "selecoes": selecoes,
         "combinacoes_por_faixa": combinacoes_por_faixa,
+        "multipla_grande_progressao": multipla_grande_progressao,
         "debug": debug_info,
     })
 
