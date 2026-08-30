@@ -462,6 +462,7 @@ def montar_combinacoes_por_faixa(selecoes, faixas=(0.5, 0.6, 0.7, 0.8, 0.9), min
                 prob_final *= s["prob_real"]
                 perna_mais_fraca = min(perna_mais_fraca, s["prob_real"])
             categorias = {_categoria_mercado(s["mercado"]) for s in combo}
+            categorias_estatisticas = {"escanteios", "cartoes", "faltas", "chutes"}
             combinacoes_geradas.append({
                 "selecoes": list(combo),
                 "prob_final": round(prob_final, 4),
@@ -469,6 +470,7 @@ def montar_combinacoes_por_faixa(selecoes, faixas=(0.5, 0.6, 0.7, 0.8, 0.9), min
                 "odd_estimada": round(1 / max(prob_final, 0.03), 2),
                 "conjunto_jogos": frozenset(jogos),
                 "n_categorias": len(categorias),
+                "n_estatisticas": len(categorias & categorias_estatisticas),
             })
 
     # pra cada conjunto de jogos, mantém só a melhor combinação: prioriza
@@ -494,7 +496,30 @@ def montar_combinacoes_por_faixa(selecoes, faixas=(0.5, 0.6, 0.7, 0.8, 0.9), min
         if c["prob_final"] > atual["prob_final"]:
             melhor_por_conjunto[chave] = c
 
-    combinacoes_finais = [c for c in melhor_por_conjunto.values() if c["odd_estimada"] >= ODD_MINIMA_ACEITAVEL]
+    # ADICIONALMENTE: pra cada conjunto de jogos, também guarda a melhor
+    # opção que usa mais mercados "estatísticos" (escanteios/cartões/
+    # faltas/chutes) - assim, quando só existe 1 conjunto de jogos
+    # possível (poucos jogos no dia), você ainda vê essa opção junto com
+    # a mais segura, em vez dela nunca aparecer
+    melhor_estatisticas_por_conjunto = {}
+    for c in combinacoes_geradas:
+        if c["odd_estimada"] < ODD_MINIMA_ACEITAVEL or c["n_estatisticas"] == 0:
+            continue
+        chave = c["conjunto_jogos"]
+        atual = melhor_estatisticas_por_conjunto.get(chave)
+        if atual is None or c["n_estatisticas"] > atual["n_estatisticas"] or (
+            c["n_estatisticas"] == atual["n_estatisticas"] and c["prob_final"] > atual["prob_final"]
+        ):
+            melhor_estatisticas_por_conjunto[chave] = c
+
+    combinacoes_finais = list(melhor_por_conjunto.values())
+    for chave, c_estat in melhor_estatisticas_por_conjunto.items():
+        c_principal = melhor_por_conjunto.get(chave)
+        # só adiciona como opção extra se for realmente diferente da principal
+        if c_principal is None or c_estat["selecoes"] != c_principal["selecoes"]:
+            combinacoes_finais.append(c_estat)
+
+    combinacoes_finais = [c for c in combinacoes_finais if c["odd_estimada"] >= ODD_MINIMA_ACEITAVEL]
 
     # remove duplicatas "econômicas": combos com a mesma odd final são a
     # mesma oportunidade na prática (ex: trocar só QUAL jogo fornece o
@@ -517,7 +542,7 @@ def montar_combinacoes_por_faixa(selecoes, faixas=(0.5, 0.6, 0.7, 0.8, 0.9), min
     resultado = {f"{int(f*100)}%": [] for f in faixas}
     for combo in combinacoes_finais:
         faixa = _faixa_da_combinacao(combo["perna_mais_fraca"])
-        combo_limpo = {k: v for k, v in combo.items() if k not in ("conjunto_jogos", "n_categorias")}
+        combo_limpo = {k: v for k, v in combo.items() if k not in ("conjunto_jogos", "n_categorias", "n_estatisticas")}
         resultado[f"{int(faixa*100)}%"].append(combo_limpo)
 
     # dentro de cada faixa, prioriza variedade de mercado primeiro, depois
