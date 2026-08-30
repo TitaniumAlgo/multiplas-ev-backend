@@ -29,6 +29,17 @@ def _buscar_eventos_finalizados(dias_atras_datas):
     return eventos
 
 
+def _somar_total(extras, id_casa, id_fora, campo):
+    """Soma um campo (escanteios/cartões/faltas/chutes) dos dois times,
+    devolvendo None se QUALQUER um dos dois não tiver o dado - evita
+    tratar 'sem informação' como zero real na hora de conferir o resultado."""
+    v_casa = extras.get(id_casa, {}).get(campo)
+    v_fora = extras.get(id_fora, {}).get(campo)
+    if v_casa is None or v_fora is None:
+        return None
+    return v_casa + v_fora
+
+
 def _placar_e_extras(evento):
     comp = (evento.get("competitions") or [{}])[0]
     status = comp.get("status", {}).get("type", {})
@@ -48,16 +59,16 @@ def _placar_e_extras(evento):
 
     extras = _extrair_escanteios_cartoes(evento)
     id_casa, id_fora = casa["team"]["id"], fora["team"]["id"]
-    escanteios_total = (extras.get(id_casa, {}).get("escanteios", 0) or 0) + (extras.get(id_fora, {}).get("escanteios", 0) or 0)
-    cartoes_total = (extras.get(id_casa, {}).get("cartoes", 0) or 0) + (extras.get(id_fora, {}).get("cartoes", 0) or 0)
 
     return {
         "nome_casa": casa["team"]["displayName"],
         "nome_fora": fora["team"]["displayName"],
         "gols_casa": gols_casa,
         "gols_fora": gols_fora,
-        "escanteios_total": escanteios_total,
-        "cartoes_total": cartoes_total,
+        "escanteios_total": _somar_total(extras, id_casa, id_fora, "escanteios"),
+        "cartoes_total": _somar_total(extras, id_casa, id_fora, "cartoes"),
+        "faltas_total": _somar_total(extras, id_casa, id_fora, "faltas"),
+        "chutes_gol_total": _somar_total(extras, id_casa, id_fora, "chutes_gol"),
     }
 
 
@@ -92,19 +103,25 @@ def _avaliar_selecao(selecao, resultado):
     if m:
         return (gc + gf) < float(m.group(1).replace(",", "."))
 
-    m = re.match(r"mais de ([\d,]+) escanteios", mercado)
-    if m:
-        return resultado["escanteios_total"] > float(m.group(1).replace(",", "."))
-    m = re.match(r"menos de ([\d,]+) escanteios", mercado)
-    if m:
-        return resultado["escanteios_total"] < float(m.group(1).replace(",", "."))
-
-    m = re.match(r"mais de ([\d,]+) cartões", mercado)
-    if m:
-        return resultado["cartoes_total"] > float(m.group(1).replace(",", "."))
-    m = re.match(r"menos de ([\d,]+) cartões", mercado)
-    if m:
-        return resultado["cartoes_total"] < float(m.group(1).replace(",", "."))
+    padroes_totais = [
+        (r"mais de ([\d,]+) escanteios", "escanteios_total", ">"),
+        (r"menos de ([\d,]+) escanteios", "escanteios_total", "<"),
+        (r"mais de ([\d,]+) cartões", "cartoes_total", ">"),
+        (r"menos de ([\d,]+) cartões", "cartoes_total", "<"),
+        (r"mais de ([\d,]+) faltas", "faltas_total", ">"),
+        (r"menos de ([\d,]+) faltas", "faltas_total", "<"),
+        (r"mais de ([\d,]+) chutes a gol", "chutes_gol_total", ">"),
+        (r"menos de ([\d,]+) chutes a gol", "chutes_gol_total", "<"),
+    ]
+    for padrao, campo, operador in padroes_totais:
+        m = re.match(padrao, mercado)
+        if not m:
+            continue
+        total = resultado.get(campo)
+        if total is None:
+            return None  # sem dado suficiente pra conferir esse jogo - fica pendente
+        linha = float(m.group(1).replace(",", "."))
+        return total > linha if operador == ">" else total < linha
 
     return None
 
