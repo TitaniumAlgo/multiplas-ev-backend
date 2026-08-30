@@ -363,6 +363,39 @@ def gerar_selecoes(data_str=None, prob_minima=0.5, incluir_escanteios_cartoes=Tr
     return sorted(selecoes, key=lambda s: s["prob_real"], reverse=True)
 
 
+def montar_multipla_grande(selecoes, max_pernas=10):
+    """Monta UMA múltipla "grande" (não é uma combinação por força bruta,
+    que explodiria com muitas seleções - isso é O(n log n), seguro).
+
+    Pega a melhor seleção de CADA jogo (sem repetir jogo), ordena da maior
+    pra menor probabilidade, e monta progressivamente: com 2 pernas
+    (as duas melhores), com 3 (as três melhores), ... até min(10, jogos
+    disponíveis). Assim você vê como a probabilidade e a odd mudam
+    conforme aumenta o tamanho, e escolhe o tamanho que preferir."""
+    melhor_por_jogo = {}
+    for s in selecoes:
+        atual = melhor_por_jogo.get(s["jogo"])
+        if atual is None or s["prob_real"] > atual["prob_real"]:
+            melhor_por_jogo[s["jogo"]] = s
+
+    pool_ordenado = sorted(melhor_por_jogo.values(), key=lambda s: s["prob_real"], reverse=True)
+
+    progressao = []
+    for tamanho in range(2, min(max_pernas, len(pool_ordenado)) + 1):
+        pernas = pool_ordenado[:tamanho]
+        prob_final = 1.0
+        for s in pernas:
+            prob_final *= s["prob_real"]
+        progressao.append({
+            "tamanho": tamanho,
+            "selecoes": pernas,
+            "prob_final": round(prob_final, 4),
+            "odd_estimada": round(1 / max(prob_final, 0.001), 2),
+        })
+
+    return progressao
+
+
 def _categoria_mercado(mercado):
     """Classifica o mercado em categoria, pra medir variedade dentro da múltipla."""
     if mercado.endswith(" vencedor") or mercado == "empate":
