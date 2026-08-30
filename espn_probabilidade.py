@@ -21,11 +21,10 @@ ESPN_STANDINGS_BASE = "https://site.api.espn.com/apis/v2/sports/soccer"
 LIGAS = {
     "bra.1": "Brasileirão Série A",
     "bra.2": "Brasileirão Série B",
-    "eng.1": "Premier League",
 }
 
 _CACHE_STATS_EXTRAS = {}  # (liga, team_id) -> stats do time (limitado em tamanho, ver _guardar_no_cache)
-_CACHE_TAMANHO_MAXIMO = 300  # evita crescer pra sempre e vazar memória ao longo do tempo
+_CACHE_TAMANHO_MAXIMO = 60  # evita crescer pra sempre e vazar memória ao longo do tempo
 
 
 def _guardar_no_cache(chave, valor):
@@ -177,12 +176,16 @@ def _stats_recentes_time(liga_codigo, time_id, ultimos_n=10):
     try:
         resp = requests.get(f"{ESPN_BASE}/{liga_codigo}/teams/{time_id}/schedule", timeout=20)
         resp.raise_for_status()
-        eventos = resp.json().get("events", [])
+        corpo = resp.json()
+        eventos = corpo.get("events", [])
+        finalizados = [e for e in eventos if _jogo_finalizado(e)][-ultimos_n:]
+        # descarta o resto da resposta bruta (jogos futuros, dados extras)
+        # assim que já temos só os finalizados que interessam - o resto
+        # não precisa continuar ocupando memória
+        del corpo, eventos, resp
     except Exception:
         _guardar_no_cache(chave_cache, padrao)
         return padrao
-
-    finalizados = [e for e in eventos if _jogo_finalizado(e)][-ultimos_n:]
 
     gols_marcados, gols_sofridos, gols_1t = [], [], []
     escanteios_lista, cartoes_lista, faltas_lista, chutes_gol_lista = [], [], [], []
@@ -274,7 +277,7 @@ def gerar_selecoes(data_str=None, prob_minima=0.5, incluir_escanteios_cartoes=Tr
             pares_time_liga.add((liga_codigo, jogo["id_casa"]))
             pares_time_liga.add((liga_codigo, jogo["id_fora"]))
 
-    with ThreadPoolExecutor(max_workers=3) as executor:
+    with ThreadPoolExecutor(max_workers=2) as executor:
         futuros = {
             executor.submit(_stats_recentes_time, liga_codigo, time_id): (liga_codigo, time_id)
             for liga_codigo, time_id in pares_time_liga
