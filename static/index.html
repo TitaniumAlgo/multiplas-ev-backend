@@ -412,7 +412,7 @@ function bilheteHtml(c, idx) {
     <div class="bilhete">
       <div class="bilhete-topo">
         <div>
-          <div class="bilhete-num">MÚLTIPLA #${String(idx + 1).padStart(2, "0")}</div>
+          <div class="bilhete-num">${idx === -1 ? "MÚLTIPLA GRANDE" : `MÚLTIPLA #${String(idx + 1).padStart(2, "0")}`}</div>
           <div class="bilhete-prob">${(c.prob_final * 100).toFixed(0)}<small>%</small></div>
           <div class="bilhete-odd">odd estimada ~${c.odd_estimada.toFixed(2)}</div>
         </div>
@@ -429,6 +429,8 @@ function bilheteHtml(c, idx) {
 
 let ultimoResultado = null;
 
+let tamanhoMultiplaGrande = 5;
+
 function renderResultadoAtual() {
   const cont = document.getElementById("resultado");
   const data = ultimoResultado;
@@ -441,6 +443,21 @@ function renderResultadoAtual() {
       <div><b>Sem odds de casas de apostas</b> — dados públicos (ESPN). A odd mostrada é <b>estimada</b> a partir da própria probabilidade, só pra simular ganho/perda no histórico.</div>
     </div>`;
 
+  const progressao = data.multipla_grande_progressao || [];
+  if (progressao.length > 0) {
+    if (tamanhoMultiplaGrande > progressao[progressao.length - 1].tamanho) tamanhoMultiplaGrande = progressao[progressao.length - 1].tamanho;
+    if (tamanhoMultiplaGrande < 2) tamanhoMultiplaGrande = 2;
+    const escolhida = progressao.find(p => p.tamanho === tamanhoMultiplaGrande) || progressao[0];
+
+    html += `<div class="secao-titulo" style="margin-top:0;">Múltipla grande (você escolhe o tamanho)</div>`;
+    html += `<div style="display:flex; align-items:center; gap:10px; margin-bottom:14px;">
+      <input type="range" min="2" max="${progressao[progressao.length - 1].tamanho}" value="${tamanhoMultiplaGrande}" id="sliderMultiplaGrande" style="flex:1;">
+      <span style="font-family:'JetBrains Mono',monospace; color:var(--gold); font-weight:700; min-width:60px; text-align:right;">${tamanhoMultiplaGrande} pernas</span>
+    </div>`;
+    html += bilheteHtml(escolhida, -1);
+  }
+
+  html += `<div class="secao-titulo">Múltiplas por faixa de confiança</div>`;
   if (combos.length > 0) {
     html += `<div class="status-linha">${combos.length} múltipla(s) com pelo menos ${faixaEscolhida} de chance por seleção</div>`;
     html += combos.map((c, i) => bilheteHtml(c, i)).join("");
@@ -448,6 +465,14 @@ function renderResultadoAtual() {
     html += `<div class="vazio">Nenhuma múltipla que compense na faixa ${faixaEscolhida}+ pra esse dia (poucos jogos ou odd baixa demais).<br>Tenta uma faixa menor ou outra data.</div>`;
   }
   cont.innerHTML = html;
+
+  const slider = document.getElementById("sliderMultiplaGrande");
+  if (slider) {
+    slider.addEventListener("input", () => {
+      tamanhoMultiplaGrande = parseInt(slider.value, 10);
+      renderResultadoAtual();
+    });
+  }
 }
 
 async function buscar() {
