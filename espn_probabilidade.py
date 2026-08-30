@@ -363,17 +363,35 @@ def gerar_selecoes(data_str=None, prob_minima=0.5, incluir_escanteios_cartoes=Tr
     return sorted(selecoes, key=lambda s: s["prob_real"], reverse=True)
 
 
-def montar_combinacoes_por_faixa(selecoes, faixas=(0.5, 0.6, 0.7, 0.8, 0.9), min_selecoes=2, max_selecoes=4):
+def _categoria_mercado(mercado):
+    """Classifica o mercado em categoria, pra medir variedade dentro da múltipla."""
+    if mercado.endswith(" vencedor") or mercado == "empate":
+        return "vencedor"
+    if "1º tempo" in mercado:
+        return "gols_1t"
+    if "escanteios" in mercado:
+        return "escanteios"
+    if "cartões" in mercado:
+        return "cartoes"
+    if "faltas" in mercado:
+        return "faltas"
+    if "chutes a gol" in mercado:
+        return "chutes"
+    if "gols" in mercado:
+        return "gols"
+    return "outro"
+
+
+def montar_combinacoes_por_faixa(selecoes, faixas=(0.5, 0.6, 0.7, 0.8, 0.9), min_selecoes=2, max_selecoes=3):
     """Agrupa combinações de pelo menos 2 seleções por faixa de probabilidade.
 
     Gera combinações usando TODAS as seleções qualificadas (sem descartar
     mercados alternativos do mesmo jogo de antemão), e depois, pra cada
-    CONJUNTO de jogos envolvido, mantém só a MELHOR combinação (a que tem
-    a odd mais alta que ainda bate o piso mínimo) - assim não aparece
-    "a mesma múltipla trocando 1 mercado" repetida, e o algoritmo escolhe
-    o mercado de cada jogo que realmente ajuda a odd compensar, em vez de
-    sempre pegar o de maior probabilidade isolada (que tende a virar odd
-    baixa demais quando combinado).
+    CONJUNTO de jogos envolvido, mantém só a MELHOR combinação - priorizando
+    (1) bater o piso de odd, (2) ter mais VARIEDADE de tipo de mercado
+    (vencedor/gols/1º tempo/escanteios/cartões/faltas/chutes - não deixa
+    gols sempre "roubar a vaga" de mercados novos), e só por último a
+    maior probabilidade entre empates de variedade.
 
     Cada combinação (já filtrada/única por conjunto de jogos) aparece em
     UMA ÚNICA faixa - a que corresponde à sua perna mais fraca."""
@@ -394,18 +412,19 @@ def montar_combinacoes_por_faixa(selecoes, faixas=(0.5, 0.6, 0.7, 0.8, 0.9), min
             for s in combo:
                 prob_final *= s["prob_real"]
                 perna_mais_fraca = min(perna_mais_fraca, s["prob_real"])
+            categorias = {_categoria_mercado(s["mercado"]) for s in combo}
             combinacoes_geradas.append({
                 "selecoes": list(combo),
                 "prob_final": round(prob_final, 4),
                 "perna_mais_fraca": perna_mais_fraca,
                 "odd_estimada": round(1 / max(prob_final, 0.03), 2),
                 "conjunto_jogos": frozenset(jogos),
+                "n_categorias": len(categorias),
             })
 
     # pra cada conjunto de jogos, mantém só a melhor combinação: prioriza
-    # as que batem o piso de odd, e entre essas, a de maior probabilidade
-    # (mais segura); se nenhuma bate o piso, guarda a de maior odd mesmo
-    # assim, pra não sumir sem explicação
+    # (1) bater o piso de odd, (2) ter mais variedade de tipo de mercado,
+    # (3) maior probabilidade como desempate final
     melhor_por_conjunto = {}
     for c in combinacoes_geradas:
         chave = c["conjunto_jogos"]
@@ -415,9 +434,15 @@ def montar_combinacoes_por_faixa(selecoes, faixas=(0.5, 0.6, 0.7, 0.8, 0.9), min
             continue
         c_compensa = c["odd_estimada"] >= ODD_MINIMA_ACEITAVEL
         atual_compensa = atual["odd_estimada"] >= ODD_MINIMA_ACEITAVEL
-        if c_compensa and not atual_compensa:
-            melhor_por_conjunto[chave] = c
-        elif c_compensa == atual_compensa and c["prob_final"] > atual["prob_final"]:
+        if c_compensa != atual_compensa:
+            if c_compensa:
+                melhor_por_conjunto[chave] = c
+            continue
+        if c["n_categorias"] != atual["n_categorias"]:
+            if c["n_categorias"] > atual["n_categorias"]:
+                melhor_por_conjunto[chave] = c
+            continue
+        if c["prob_final"] > atual["prob_final"]:
             melhor_por_conjunto[chave] = c
 
     combinacoes_finais = [c for c in melhor_por_conjunto.values() if c["odd_estimada"] >= ODD_MINIMA_ACEITAVEL]
@@ -427,7 +452,7 @@ def montar_combinacoes_por_faixa(selecoes, faixas=(0.5, 0.6, 0.7, 0.8, 0.9), min
     # escanteio de "menos de 9,5", que dá ~97% em quase todo jogo, gera
     # dezenas de combos tecnicamente diferentes mas sem variedade real)
     vistos_por_odd = {}
-    for c in sorted(combinacoes_finais, key=lambda x: x["prob_final"], reverse=True):
+    for c in sorted(combinacoes_finais, key=lambda x: (x["n_categorias"], x["prob_final"]), reverse=True):
         chave_odd = round(c["odd_estimada"], 2)
         if chave_odd not in vistos_por_odd:
             vistos_por_odd[chave_odd] = c
@@ -443,17 +468,19 @@ def montar_combinacoes_por_faixa(selecoes, faixas=(0.5, 0.6, 0.7, 0.8, 0.9), min
     resultado = {f"{int(f*100)}%": [] for f in faixas}
     for combo in combinacoes_finais:
         faixa = _faixa_da_combinacao(combo["perna_mais_fraca"])
-        combo_limpo = {k: v for k, v in combo.items() if k != "conjunto_jogos"}
+        combo_limpo = {k: v for k, v in combo.items() if k not in ("conjunto_jogos", "n_categorias")}
         resultado[f"{int(faixa*100)}%"].append(combo_limpo)
 
-    # ordena por probabilidade e, dentro de cada faixa, limita quantas
-    # vezes o MESMO jogo pode aparecer em múltiplas diferentes (2x) - isso
-    # evita o padrão de "1 jogo âncora dominando quase toda combinação",
-    # mas ainda deixa espaço pra mercados de probabilidade um pouco menor
-    # (escanteios/cartões/faltas/chutes) aparecerem, não só gols/vencedor
+    # dentro de cada faixa, prioriza variedade de mercado primeiro, depois
+    # probabilidade, e limita quantas vezes o MESMO jogo pode aparecer em
+    # múltiplas diferentes (2x) - evita 1 jogo âncora dominando tudo, mas
+    # ainda deixa espaço pra escanteios/cartões/faltas/chutes aparecerem
     LIMITE_REPETICOES_POR_JOGO = 2
     for chave in resultado:
-        resultado[chave].sort(key=lambda c: c["prob_final"], reverse=True)
+        resultado[chave].sort(
+            key=lambda c: (len({_categoria_mercado(s["mercado"]) for s in c["selecoes"]}), c["prob_final"]),
+            reverse=True,
+        )
         selecionadas = []
         contagem_por_jogo = {}
         for combo in resultado[chave]:
