@@ -8,7 +8,7 @@ import re
 import requests
 
 import historico_prob
-from espn_probabilidade import LIGAS, _mesmo_time, _extrair_escanteios_cartoes, ESPN_BASE
+from espn_probabilidade import LIGAS, _mesmo_time, _extrair_escanteios_cartoes, ESPN_BASE, _jogo_finalizado
 
 
 def _buscar_eventos_finalizados(dias_atras_datas):
@@ -42,8 +42,7 @@ def _somar_total(extras, id_casa, id_fora, campo):
 
 def _placar_e_extras(evento):
     comp = (evento.get("competitions") or [{}])[0]
-    status = comp.get("status", {}).get("type", {})
-    if not status.get("completed"):
+    if not _jogo_finalizado(evento):
         return None
 
     competidores = comp.get("competitors", [])
