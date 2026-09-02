@@ -21,6 +21,7 @@ ESPN_STANDINGS_BASE = "https://site.api.espn.com/apis/v2/sports/soccer"
 LIGAS = {
     "bra.1": "Brasileirão Série A",
     "bra.2": "Brasileirão Série B",
+    "bra.copa_do_brazil": "Copa do Brasil",
 }
 
 _CACHE_STATS_EXTRAS = {}  # (liga, team_id) -> stats do time (limitado em tamanho, ver _guardar_no_cache)
@@ -543,29 +544,36 @@ def montar_combinacoes_por_faixa(selecoes, faixas=(0.5, 0.6, 0.7, 0.8, 0.9), min
     for combo in combinacoes_finais:
         faixa = _faixa_da_combinacao(combo["perna_mais_fraca"])
         combo_limpo = {k: v for k, v in combo.items() if k not in ("conjunto_jogos", "n_categorias", "n_estatisticas")}
-        resultado[f"{int(faixa*100)}%"].append(combo_limpo)
+        combo_limpo["_faixa"] = f"{int(faixa*100)}%"
+        resultado.setdefault(combo_limpo["_faixa"], [])
+        resultado[combo_limpo["_faixa"]].append(combo_limpo)
 
-    # dentro de cada faixa, prioriza variedade de mercado primeiro, depois
-    # probabilidade, e limita quantas vezes o MESMO jogo pode aparecer em
-    # múltiplas diferentes (2x) - evita 1 jogo âncora dominando tudo, mas
-    # ainda deixa espaço pra escanteios/cartões/faltas/chutes aparecerem
-    LIMITE_REPETICOES_POR_JOGO = 2
-    for chave in resultado:
-        resultado[chave].sort(
-            key=lambda c: (len({_categoria_mercado(s["mercado"]) for s in c["selecoes"]}), c["prob_final"]),
-            reverse=True,
-        )
-        selecionadas = []
-        contagem_por_jogo = {}
-        for combo in resultado[chave]:
-            jogos_do_combo = {s["jogo"] for s in combo["selecoes"]}
-            if any(contagem_por_jogo.get(j, 0) >= LIMITE_REPETICOES_POR_JOGO for j in jogos_do_combo):
-                continue
-            selecionadas.append(combo)
-            for j in jogos_do_combo:
-                contagem_por_jogo[j] = contagem_por_jogo.get(j, 0) + 1
-            if len(selecionadas) >= 8:
-                break
-        resultado[chave] = selecionadas
+    # exclusividade GLOBAL: uma seleção (jogo + mercado específico) que já
+    # apareceu numa múltipla mostrada não pode aparecer em NENHUMA outra,
+    # nem na mesma faixa nem em faixa diferente - cada combinação candidata
+    # de todas as faixas entra numa fila única, ordenada por variedade de
+    # mercado e depois probabilidade, e só é aceita se NENHUMA das pernas
+    # dela já foi usada por uma múltipla aceita antes
+    todas_candidatas = []
+    for combos_da_faixa in resultado.values():
+        todas_candidatas.extend(combos_da_faixa)
+    todas_candidatas.sort(
+        key=lambda c: (len({_categoria_mercado(s["mercado"]) for s in c["selecoes"]}), c["prob_final"]),
+        reverse=True,
+    )
 
-    return resultado
+    pernas_usadas = set()  # (jogo, mercado) já usados em alguma múltipla aceita
+    aceitas_por_faixa = {f"{int(f*100)}%": [] for f in faixas}
+    LIMITE_POR_FAIXA = 8
+    for combo in todas_candidatas:
+        pernas_do_combo = {(s["jogo"], s["mercado"]) for s in combo["selecoes"]}
+        if pernas_do_combo & pernas_usadas:
+            continue  # alguma perna daqui já está em outra múltipla aceita
+        faixa = combo["_faixa"]
+        if len(aceitas_por_faixa[faixa]) >= LIMITE_POR_FAIXA:
+            continue
+        combo_final = {k: v for k, v in combo.items() if k != "_faixa"}
+        aceitas_por_faixa[faixa].append(combo_final)
+        pernas_usadas |= pernas_do_combo
+
+    return aceitas_por_faixa
