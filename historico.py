@@ -13,7 +13,11 @@ import json
 import sqlite3
 from datetime import datetime, date
 
-DB_PATH = "historico.db"
+import os
+
+_DADOS_DIR = os.environ.get("DADOS_DIR", ".")
+os.makedirs(_DADOS_DIR, exist_ok=True)
+DB_PATH = os.path.join(_DADOS_DIR, "historico.db")
 
 
 def _conectar():
