@@ -312,6 +312,7 @@ def api_espn_multiplas():
     """
     data_str = request.args.get("data", date.today().isoformat())
     incluir_extras = request.args.get("escanteios_cartoes", "1") == "1"
+    incluir_jogadores = request.args.get("jogadores") == "1"  # desligado por padrão - resposta pesada
     forcar_nova_busca = request.args.get("forcar") == "1"
 
     faixas = ["50%", "60%", "70%", "80%", "90%"]
@@ -348,7 +349,8 @@ def api_espn_multiplas():
     debug_info = {}
     try:
         selecoes = espn_probabilidade.gerar_selecoes(
-            data_str, prob_minima=0.5, incluir_escanteios_cartoes=incluir_extras, debug_info=debug_info
+            data_str, prob_minima=0.5, incluir_escanteios_cartoes=incluir_extras,
+            incluir_jogadores=incluir_jogadores, debug_info=debug_info
         )
     except Exception as exc:
         return jsonify({"erro": str(exc), "debug": debug_info}), 502
