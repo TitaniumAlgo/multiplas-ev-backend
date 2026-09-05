@@ -272,7 +272,7 @@ def _poisson_over_under(media_total, linhas):
     return resultado
 
 
-def gerar_selecoes(data_str=None, prob_minima=0.5, incluir_escanteios_cartoes=True, debug_info=None):
+def gerar_selecoes(data_str=None, prob_minima=0.5, incluir_escanteios_cartoes=True, incluir_jogadores=False, debug_info=None):
     if data_str is None:
         data_str = date.today().isoformat()
 
@@ -376,6 +376,17 @@ def gerar_selecoes(data_str=None, prob_minima=0.5, incluir_escanteios_cartoes=Tr
                 except Exception as exc:
                     if debug_info is not None:
                         debug_info.setdefault("erros_escanteios_cartoes", []).append(f"{nome_jogo}: {exc}")
+
+            if incluir_jogadores:
+                try:
+                    import espn_jogadores
+                    selecoes_jogadores = espn_jogadores.gerar_selecoes_jogadores(
+                        liga_codigo, liga_nome, nome_jogo, jogo["id_casa"], jogo["id_fora"], prob_minima=prob_minima
+                    )
+                    selecoes.extend(selecoes_jogadores)
+                except Exception as exc:
+                    if debug_info is not None:
+                        debug_info.setdefault("erros_jogadores", []).append(f"{nome_jogo}: {exc}")
 
     return sorted(selecoes, key=lambda s: s["prob_real"], reverse=True)
 
