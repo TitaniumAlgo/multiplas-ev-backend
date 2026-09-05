@@ -125,9 +125,7 @@ def _avaliar_selecao(selecao, resultado):
     return None
 
 
-def atualizar_pendentes():
-    from datetime import date, timedelta
-
+def atualizar_pendentes(debug_info=None):
     pendentes = [item for item in historico_prob.listar_historico() if item["resultado"] == "pendente"]
     if not pendentes:
         return 0
@@ -142,21 +140,42 @@ def atualizar_pendentes():
         if r:
             resultados.append(r)
 
+    if debug_info is not None:
+        debug_info["datas_verificadas"] = datas_necessarias
+        debug_info["total_eventos_buscados"] = len(eventos)
+        debug_info["total_jogos_finalizados_encontrados"] = len(resultados)
+        debug_info["jogos_finalizados_nomes"] = [f"{r['nome_casa']} x {r['nome_fora']}" for r in resultados]
+        debug_info["detalhe_pendentes"] = []
+
     atualizadas = 0
     for item in pendentes:
         avaliacoes = []
+        detalhe_item = {"data_jogo": item["data_jogo"], "pernas": []}
         for selecao in item["selecoes"]:
             resultado = _encontrar_resultado(selecao["jogo"], resultados)
             if resultado is None:
                 avaliacoes.append(None)
+                detalhe_item["pernas"].append({"jogo": selecao["jogo"], "mercado": selecao["mercado"], "motivo": "jogo não encontrado nos resultados buscados"})
                 continue
-            avaliacoes.append(_avaliar_selecao(selecao, resultado))
+            avaliacao = _avaliar_selecao(selecao, resultado)
+            avaliacoes.append(avaliacao)
+            if avaliacao is None:
+                detalhe_item["pernas"].append({"jogo": selecao["jogo"], "mercado": selecao["mercado"], "motivo": "jogo encontrado, mas faltou dado (ex: escanteios/cartões) pra conferir esse mercado"})
+            else:
+                detalhe_item["pernas"].append({"jogo": selecao["jogo"], "mercado": selecao["mercado"], "motivo": f"conferido: {'bateu' if avaliacao else 'não bateu'}"})
 
         if any(a is False for a in avaliacoes):
             historico_prob.marcar_resultado(item["id"], "perdeu", selecoes_resultado=avaliacoes)
             atualizadas += 1
+            detalhe_item["resultado_final"] = "perdeu"
         elif avaliacoes and all(a is True for a in avaliacoes):
             historico_prob.marcar_resultado(item["id"], "ganhou", selecoes_resultado=avaliacoes)
             atualizadas += 1
+            detalhe_item["resultado_final"] = "ganhou"
+        else:
+            detalhe_item["resultado_final"] = "continua pendente"
+
+        if debug_info is not None:
+            debug_info["detalhe_pendentes"].append(detalhe_item)
 
     return atualizadas
