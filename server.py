@@ -196,6 +196,17 @@ def api_serie_b_probabilidade():
     })
 
 
+@app.route("/api/historico-diagnostico")
+def api_historico_diagnostico():
+    debug_info = {}
+    try:
+        atualizadas = resultados_espn.atualizar_pendentes(debug_info=debug_info)
+        debug_info["total_atualizadas_agora"] = atualizadas
+    except Exception as exc:
+        debug_info["erro"] = str(exc)
+    return jsonify(debug_info)
+
+
 @app.route("/api/historico-prob")
 def api_historico_prob():
     try:
