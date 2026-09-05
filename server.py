@@ -386,6 +386,21 @@ def api_espn_multiplas():
     })
 
 
+@app.route("/api/jogador-diagnostico/<liga_codigo>/<time_id>")
+def api_jogador_diagnostico(liga_codigo, time_id):
+    import espn_jogadores_diag as ejd
+    resultado = {}
+    try:
+        resultado["roster"] = ejd.buscar_roster(liga_codigo, time_id)
+    except Exception as exc:
+        resultado["erro_roster"] = str(exc)
+    try:
+        resultado["time_detalhe"] = ejd.buscar_lideres(liga_codigo, time_id)
+    except Exception as exc:
+        resultado["erro_lideres"] = str(exc)
+    return jsonify(resultado)
+
+
 @app.route("/api/espn-diagnostico")
 def api_espn_diagnostico():
     data_str = request.args.get("data")  # formato YYYY-MM-DD, opcional
