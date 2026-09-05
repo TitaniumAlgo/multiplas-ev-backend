@@ -6,10 +6,13 @@ combinações geradas pelo modelo de probabilidade, sem valor em R$
 
 import hashlib
 import json
+import os
 import sqlite3
 from datetime import datetime
 
-DB_PATH = "historico_prob.db"
+_DADOS_DIR = os.environ.get("DADOS_DIR", ".")
+os.makedirs(_DADOS_DIR, exist_ok=True)
+DB_PATH = os.path.join(_DADOS_DIR, "historico_prob.db")
 
 VALOR_APOSTA_SIMULADA = 10.0
 
