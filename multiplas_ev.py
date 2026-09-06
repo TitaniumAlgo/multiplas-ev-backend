@@ -33,19 +33,30 @@ def expected_goals(time_casa, time_fora, media_gols_liga=2.7):
     Calcula o número esperado de gols de cada time no confronto,
     a partir da força de ataque/defesa de cada um.
 
+    Usa a média ESPECÍFICA de jogar em casa (pro time da casa) e de jogar
+    fora (pro time visitante), quando disponível - times costumam marcar
+    mais e sofrer menos em casa, então misturar tudo numa média só
+    subestima esse efeito.
+
     time_casa / time_fora: dict com:
-      - gols_marcados_media: média de gols marcados por jogo
-      - gols_sofridos_media: média de gols sofridos por jogo
+      - gols_marcados_media / gols_sofridos_media (média geral, sempre presente)
+      - gols_marcados_casa_media / gols_sofridos_casa_media (opcional)
+      - gols_marcados_fora_media / gols_sofridos_fora_media (opcional)
     """
     media_marcados_liga = media_gols_liga / 2
     media_sofridos_liga = media_gols_liga / 2
 
-    forca_ataque_casa = time_casa["gols_marcados_media"] / media_marcados_liga
-    forca_defesa_fora = time_fora["gols_sofridos_media"] / media_sofridos_liga
+    marcados_casa = time_casa.get("gols_marcados_casa_media", time_casa["gols_marcados_media"])
+    sofridos_casa = time_casa.get("gols_sofridos_casa_media", time_casa["gols_sofridos_media"])
+    marcados_fora = time_fora.get("gols_marcados_fora_media", time_fora["gols_marcados_media"])
+    sofridos_fora = time_fora.get("gols_sofridos_fora_media", time_fora["gols_sofridos_media"])
+
+    forca_ataque_casa = marcados_casa / media_marcados_liga
+    forca_defesa_fora = sofridos_fora / media_sofridos_liga
     gols_esperados_casa = forca_ataque_casa * forca_defesa_fora * media_marcados_liga
 
-    forca_ataque_fora = time_fora["gols_marcados_media"] / media_marcados_liga
-    forca_defesa_casa = time_casa["gols_sofridos_media"] / media_sofridos_liga
+    forca_ataque_fora = marcados_fora / media_marcados_liga
+    forca_defesa_casa = sofridos_casa / media_sofridos_liga
     gols_esperados_fora = forca_ataque_fora * forca_defesa_casa * media_marcados_liga
 
     return gols_esperados_casa, gols_esperados_fora
