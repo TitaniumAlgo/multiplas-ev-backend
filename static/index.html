@@ -303,7 +303,10 @@
       <div class="marca-titulo">MÚLTIPLAS <span class="accent">·</span> PROB</div>
       <div class="marca-sub">Principais ligas do mundo — probabilidade real</div>
     </div>
-    <button class="btn-hist" id="btnHistorico">Histórico</button>
+    <div style="display:flex; gap:6px;">
+      <button class="btn-hist" id="btnComoFunciona">?</button>
+      <button class="btn-hist" id="btnHistorico">Histórico</button>
+    </div>
   </div>
   <div class="linha-scroll" id="dias"></div>
   <div class="linha-scroll" id="faixas"></div>
@@ -558,6 +561,70 @@ async function renderHistorico() {
     cont.innerHTML = `<div class="aviso" style="border-left-color:var(--danger);"><span>⚠️</span><div>${e.message || "Não foi possível carregar o histórico."}</div></div>`;
   }
 }
+
+function renderComoFunciona() {
+  const cont = document.getElementById("resultado");
+  cont.innerHTML = `
+    <div class="secao-titulo" style="margin-top:0;">1. De onde vêm os dados</div>
+    <div class="aviso"><span>📊</span><div>
+      ESPN pública (sem chave, dados abertos) — Brasileirão Série A, Série B e Copa do Brasil.
+      Pra cada time, busca os <b>últimos 10 jogos reais</b> e calcula a média de gols, escanteios, cartões, faltas e chutes a gol — separando jogos em <b>casa</b> e <b>fora</b>, porque isso muda bastante a força do time.
+    </div></div>
+
+    <div class="secao-titulo">2. Como calcula a probabilidade</div>
+    <div class="aviso"><span>📐</span><div>
+      Usa <b>distribuição de Poisson</b> — o mesmo método estatístico que casas de apostas profissionais usam pra futebol. A partir da força de ataque/defesa de cada time, estima quantos gols cada um deve fazer, e daí calcula a chance de cada placar possível.
+      Escanteios, cartões, faltas e chutes usam a mesma lógica, só que direto na média combinada dos dois times.
+    </div></div>
+
+    <div class="secao-titulo">3. Mercados cobertos</div>
+    <div class="aviso"><span>⚽</span><div>
+      Vencedor/empate · Ambas marcam (BTTS) · Mais/menos de 2,5 gols · Gols no 1º tempo · Escanteios · Cartões · Faltas · Chutes a gol (por time e, opcionalmente, por jogador).
+    </div></div>
+
+    <div class="secao-titulo">4. Como as múltiplas são montadas</div>
+    <div class="aviso"><span>🎯</span><div>
+      Testa combinações de 2-3 jogos diferentes, prioriza <b>variedade de mercado</b> (não deixa só gols dominar) e descarta qualquer combinação com <b>odd estimada abaixo de 1,30</b> (não compensaria o risco).
+      Uma mesma seleção nunca aparece em mais de uma múltipla mostrada — nem na mesma faixa, nem em faixas diferentes.
+    </div></div>
+
+    <div class="secao-titulo">5. Faixas de confiança</div>
+    <div class="aviso"><span>📶</span><div>
+      50/60/70/80/90% = probabilidade mínima da perna mais fraca da múltipla. Faixas mais altas exigem mais jogos disponíveis no dia — em dias com poucos jogos, pode não ter múltipla em toda faixa.
+    </div></div>
+
+    <div class="secao-titulo">6. Odd estimada e histórico</div>
+    <div class="aviso"><span>💰</span><div>
+      <b>Não é odd real de casa de apostas</b> — é calculada a partir da própria probabilidade (1 ÷ probabilidade), só pra simular ganho/perda de R$10 por múltipla no histórico.
+      O histórico confere sozinho o resultado real de cada perna assim que o jogo termina.
+    </div></div>
+
+    <div class="secao-titulo">Limitações importantes</div>
+    <div class="aviso" style="border-left-color:var(--danger);"><span>⚠️</span><div>
+      Não sabe de lesões, suspensões ou escalação de última hora. Times com poucos jogos na temporada têm previsão menos confiável. É um modelo estatístico — nenhum modelo elimina o risco de perder.
+    </div></div>
+  `;
+}
+
+document.getElementById("btnComoFunciona").addEventListener("click", () => {
+  telaAtual = "info";
+  document.getElementById("dias").style.display = "none";
+  document.getElementById("faixas").style.display = "none";
+  document.getElementById("btnHistorico").style.display = "none";
+  renderComoFunciona();
+  const btnVoltarInfo = document.createElement("button");
+  btnVoltarInfo.className = "btn-hist ativo";
+  btnVoltarInfo.textContent = "← Voltar";
+  btnVoltarInfo.onclick = () => {
+    telaAtual = "buscar";
+    document.getElementById("dias").style.display = "flex";
+    document.getElementById("faixas").style.display = "flex";
+    document.getElementById("btnHistorico").style.display = "inline-block";
+    btnVoltarInfo.remove();
+    if (ultimoResultado) { renderResultadoAtual(); } else { buscar(); }
+  };
+  document.getElementById("btnComoFunciona").insertAdjacentElement("afterend", btnVoltarInfo);
+});
 
 document.getElementById("btnHistorico").addEventListener("click", () => {
   const btn = document.getElementById("btnHistorico");
