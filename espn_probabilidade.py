@@ -361,6 +361,8 @@ def gerar_selecoes(data_str=None, prob_minima=0.5, incluir_escanteios_cartoes=Tr
                 "empate": "empate",
                 "over_2.5": "mais de 2,5 gols",
                 "under_2.5": "menos de 2,5 gols",
+                "btts_sim": "ambas marcam",
+                "btts_nao": "não ambas marcam",
             }
             for chave, nome_mercado in mapa.items():
                 prob = probs_gols.get(chave)
@@ -460,6 +462,8 @@ def _categoria_mercado(mercado):
     """Classifica o mercado em categoria, pra medir variedade dentro da múltipla."""
     if mercado.endswith(" vencedor") or mercado == "empate":
         return "vencedor"
+    if "ambas marcam" in mercado:
+        return "btts"
     if "1º tempo" in mercado:
         return "gols_1t"
     if "escanteios" in mercado:
