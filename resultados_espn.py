@@ -87,6 +87,10 @@ def _avaliar_selecao(selecao, resultado):
 
     if mercado == "empate":
         return gc == gf
+    if mercado == "ambas marcam":
+        return gc >= 1 and gf >= 1
+    if mercado == "não ambas marcam":
+        return not (gc >= 1 and gf >= 1)
     if mercado.endswith(" vencedor"):
         nome_time = mercado[: -len(" vencedor")]
         if _mesmo_time(nome_time, resultado["nome_casa"]):
