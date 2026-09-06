@@ -205,6 +205,8 @@ def _stats_recentes_time(liga_codigo, time_id, ultimos_n=10):
         return padrao
 
     gols_marcados, gols_sofridos, gols_1t = [], [], []
+    gols_marcados_casa, gols_sofridos_casa = [], []
+    gols_marcados_fora, gols_sofridos_fora = [], []
     escanteios_lista, cartoes_lista, faltas_lista, chutes_gol_lista = [], [], [], []
 
     for ev in finalizados:
@@ -222,6 +224,14 @@ def _stats_recentes_time(liga_codigo, time_id, ultimos_n=10):
         gols_marcados.append(gp)
         gols_sofridos.append(ga)
 
+        jogou_em_casa = proprio.get("homeAway") == "home"
+        if jogou_em_casa:
+            gols_marcados_casa.append(gp)
+            gols_sofridos_casa.append(ga)
+        else:
+            gols_marcados_fora.append(gp)
+            gols_sofridos_fora.append(ga)
+
         gols_1t_proprio = _extrair_valor_numerico(_extrair_gols_1o_tempo_bruto(proprio))
         if gols_1t_proprio is not None:
             gols_1t.append(gols_1t_proprio)
@@ -238,18 +248,40 @@ def _stats_recentes_time(liga_codigo, time_id, ultimos_n=10):
             if dados_time.get("chutes_gol") is not None:
                 chutes_gol_lista.append(dados_time["chutes_gol"])
 
+    MINIMO_AMOSTRA_EXTRAS = 5  # menos que isso, não é confiável o bastante - usa o chute conservador
+    MINIMO_AMOSTRA_MANDO = 3  # pra casa/fora específico - poucos jogos em casa/fora ainda dá pra usar geral
+
     def _media(lista, padrao_valor):
         return (sum(lista) / len(lista)) if lista else padrao_valor
 
+    def _media_com_minimo(lista, padrao_valor, minimo=MINIMO_AMOSTRA_EXTRAS):
+        if len(lista) < minimo:
+            return padrao_valor  # amostra pequena demais - não confia, usa o padrão conservador
+        return sum(lista) / len(lista)
+
+    media_geral_marcados = _media(gols_marcados, padrao["gols_marcados_media"])
+    media_geral_sofridos = _media(gols_sofridos, padrao["gols_sofridos_media"])
+
     resultado = {
-        "gols_marcados_media": _media(gols_marcados, padrao["gols_marcados_media"]),
-        "gols_sofridos_media": _media(gols_sofridos, padrao["gols_sofridos_media"]),
+        "gols_marcados_media": media_geral_marcados,
+        "gols_sofridos_media": media_geral_sofridos,
+        # específico de mando de campo - só usa se tiver amostra mínima,
+        # senão cai pra média geral (mais confiável que só 1-2 jogos)
+        "gols_marcados_casa_media": _media_com_minimo(gols_marcados_casa, media_geral_marcados, MINIMO_AMOSTRA_MANDO),
+        "gols_sofridos_casa_media": _media_com_minimo(gols_sofridos_casa, media_geral_sofridos, MINIMO_AMOSTRA_MANDO),
+        "gols_marcados_fora_media": _media_com_minimo(gols_marcados_fora, media_geral_marcados, MINIMO_AMOSTRA_MANDO),
+        "gols_sofridos_fora_media": _media_com_minimo(gols_sofridos_fora, media_geral_sofridos, MINIMO_AMOSTRA_MANDO),
         "gols_1t_media": _media(gols_1t, padrao["gols_1t_media"]),
-        "escanteios_media": _media(escanteios_lista, padrao["escanteios_media"]),
-        "cartoes_media": _media(cartoes_lista, padrao["cartoes_media"]),
-        "faltas_media": _media(faltas_lista, padrao["faltas_media"]),
-        "chutes_gol_media": _media(chutes_gol_lista, padrao["chutes_gol_media"]),
+        "escanteios_media": _media_com_minimo(escanteios_lista, padrao["escanteios_media"]),
+        "cartoes_media": _media_com_minimo(cartoes_lista, padrao["cartoes_media"]),
+        "faltas_media": _media_com_minimo(faltas_lista, padrao["faltas_media"]),
+        "chutes_gol_media": _media_com_minimo(chutes_gol_lista, padrao["chutes_gol_media"]),
         "jogos_analisados": len(gols_marcados),
+        "amostra_extras": {
+            "escanteios": len(escanteios_lista), "cartoes": len(cartoes_lista),
+            "faltas": len(faltas_lista), "chutes_gol": len(chutes_gol_lista),
+            "jogos_casa": len(gols_marcados_casa), "jogos_fora": len(gols_marcados_fora),
+        },
     }
     _guardar_no_cache(chave_cache, resultado)
     return resultado
