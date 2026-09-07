@@ -309,7 +309,6 @@
     </div>
   </div>
   <div class="linha-scroll" id="dias"></div>
-  <div class="linha-scroll" id="faixas"></div>
 </div>
 
 <div class="corpo">
@@ -322,7 +321,6 @@
 const FAIXAS = ["50%", "60%", "70%", "80%", "90%"];
 
 let dataEscolhida = new Date().toISOString().slice(0, 10);
-let faixaEscolhida = "50%";
 let telaAtual = "buscar"; // "buscar" | "historico"
 
 function formatarDiaLabel(isoStr, idx) {
@@ -350,22 +348,6 @@ function montarDias() {
     };
     cont.appendChild(btn);
   }
-}
-
-function montarFaixas() {
-  const cont = document.getElementById("faixas");
-  cont.innerHTML = "";
-  FAIXAS.forEach(f => {
-    const btn = document.createElement("button");
-    btn.className = "pill pill-faixa" + (f === faixaEscolhida ? " ativo" : "");
-    btn.innerHTML = `<span class="ponto"></span>${f}+`;
-    btn.onclick = () => {
-      faixaEscolhida = f;
-      montarFaixas();
-      if (telaAtual === "buscar") renderResultadoAtual();
-    };
-    cont.appendChild(btn);
-  });
 }
 
 let ultimoDataCarregada = null;
@@ -415,7 +397,7 @@ function bilheteHtml(c, idx) {
     <div class="bilhete">
       <div class="bilhete-topo">
         <div>
-          <div class="bilhete-num">${idx === -1 ? "MÚLTIPLA GRANDE" : `MÚLTIPLA #${String(idx + 1).padStart(2, "0")}`}</div>
+          <div class="bilhete-num">${idx === -1 ? "MÚLTIPLA GRANDE" : `MÚLTIPLA #${String(idx + 1).padStart(2, "0")}`}${c.faixa ? ` · <span style="color:var(--gold);">${c.faixa}+ confiança</span>` : ""}</div>
           <div class="bilhete-prob">${(c.prob_final * 100).toFixed(0)}<small>%</small></div>
           <div class="bilhete-odd">odd estimada ~${c.odd_estimada.toFixed(2)}</div>
         </div>
@@ -439,7 +421,6 @@ function renderResultadoAtual() {
   const data = ultimoResultado;
   if (!data) return;
 
-  const combos = (data.combinacoes_por_faixa && data.combinacoes_por_faixa[faixaEscolhida]) || [];
   let html = `
     <div class="aviso">
       <span>ℹ️</span>
@@ -460,12 +441,22 @@ function renderResultadoAtual() {
     html += bilheteHtml(escolhida, -1);
   }
 
-  html += `<div class="secao-titulo">Múltiplas por faixa de confiança</div>`;
-  if (combos.length > 0) {
-    html += `<div class="status-linha">${combos.length} múltipla(s) com pelo menos ${faixaEscolhida} de chance por seleção</div>`;
-    html += combos.map((c, i) => bilheteHtml(c, i)).join("");
+  html += `<div class="secao-titulo">Todas as múltiplas do dia</div>`;
+
+  // junta as múltiplas de todas as faixas numa lista só, marcando em cada
+  // uma a que faixa de confiança ela pertence (em vez de botões de filtro)
+  const todasComFaixa = [];
+  FAIXAS.forEach(f => {
+    const combosDaFaixa = (data.combinacoes_por_faixa && data.combinacoes_por_faixa[f]) || [];
+    combosDaFaixa.forEach(c => todasComFaixa.push({ ...c, faixa: f }));
+  });
+  todasComFaixa.sort((a, b) => b.prob_final - a.prob_final);
+
+  if (todasComFaixa.length > 0) {
+    html += `<div class="status-linha">${todasComFaixa.length} múltipla(s) encontradas — ordenadas da mais provável pra menos</div>`;
+    html += todasComFaixa.map((c, i) => bilheteHtml(c, i)).join("");
   } else {
-    html += `<div class="vazio">Nenhuma múltipla que compense na faixa ${faixaEscolhida}+ pra esse dia (poucos jogos ou odd baixa demais).<br>Tenta uma faixa menor ou outra data.</div>`;
+    html += `<div class="vazio">Nenhuma múltipla que compense pra esse dia (poucos jogos ou odd baixa demais).<br>Tenta outra data.</div>`;
   }
   cont.innerHTML = html;
 
@@ -492,18 +483,6 @@ async function buscar() {
     }
     if (!resp.ok) throw new Error(data.erro || "Erro ao buscar.");
     ultimoResultado = data;
-
-    // se a faixa atual estiver vazia, pula automaticamente pra primeira
-    // faixa que tiver alguma múltipla, em vez de mostrar "vazio" à toa
-    const faixaAtualVazia = !(data.combinacoes_por_faixa && data.combinacoes_por_faixa[faixaEscolhida] && data.combinacoes_por_faixa[faixaEscolhida].length);
-    if (faixaAtualVazia) {
-      const faixaComConteudo = FAIXAS.find(f => data.combinacoes_por_faixa && data.combinacoes_por_faixa[f] && data.combinacoes_por_faixa[f].length);
-      if (faixaComConteudo) {
-        faixaEscolhida = faixaComConteudo;
-        montarFaixas();
-      }
-    }
-
     renderResultadoAtual();
   } catch (e) {
     cont.innerHTML = `<div class="aviso" style="border-left-color:var(--danger);"><span>⚠️</span><div>${e.message}</div></div>`;
@@ -609,7 +588,6 @@ function renderComoFunciona() {
 document.getElementById("btnComoFunciona").addEventListener("click", () => {
   telaAtual = "info";
   document.getElementById("dias").style.display = "none";
-  document.getElementById("faixas").style.display = "none";
   document.getElementById("btnHistorico").style.display = "none";
   renderComoFunciona();
   const btnVoltarInfo = document.createElement("button");
@@ -618,7 +596,6 @@ document.getElementById("btnComoFunciona").addEventListener("click", () => {
   btnVoltarInfo.onclick = () => {
     telaAtual = "buscar";
     document.getElementById("dias").style.display = "flex";
-    document.getElementById("faixas").style.display = "flex";
     document.getElementById("btnHistorico").style.display = "inline-block";
     btnVoltarInfo.remove();
     if (ultimoResultado) { renderResultadoAtual(); } else { buscar(); }
@@ -633,20 +610,17 @@ document.getElementById("btnHistorico").addEventListener("click", () => {
     btn.textContent = "Buscar";
     btn.classList.add("ativo");
     document.getElementById("dias").style.display = "none";
-    document.getElementById("faixas").style.display = "none";
     renderHistorico();
   } else {
     telaAtual = "buscar";
     btn.textContent = "Histórico";
     btn.classList.remove("ativo");
     document.getElementById("dias").style.display = "flex";
-    document.getElementById("faixas").style.display = "flex";
     if (ultimoResultado) { renderResultadoAtual(); } else { buscar(); }
   }
 });
 
 montarDias();
-montarFaixas();
 buscar();
 </script>
 </body>
