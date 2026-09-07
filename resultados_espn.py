@@ -68,6 +68,11 @@ def _placar_e_extras(evento):
         "cartoes_total": _somar_total(extras, id_casa, id_fora, "cartoes"),
         "faltas_total": _somar_total(extras, id_casa, id_fora, "faltas"),
         "chutes_gol_total": _somar_total(extras, id_casa, id_fora, "chutes_gol"),
+        # valores individuais de cada time, pros mercados "Time X mais de N escanteios"
+        "por_time": {
+            casa["team"]["displayName"]: extras.get(id_casa, {}),
+            fora["team"]["displayName"]: extras.get(id_fora, {}),
+        },
     }
 
 
@@ -105,6 +110,24 @@ def _avaliar_selecao(selecao, resultado):
     m = re.match(r"menos de ([\d,]+) gols", mercado)
     if m:
         return (gc + gf) < float(m.group(1).replace(",", "."))
+
+    # mercados POR TIME (ex: "Flamengo mais de 4,5 escanteios") - precisa
+    # bater o nome do time primeiro, depois o valor individual dele
+    m_time = re.match(r"(.+?) (mais|menos) de ([\d,.]+) (escanteios|cartões|faltas|chutes a gol)$", mercado)
+    if m_time:
+        nome_time, direcao, linha_txt, tipo = m_time.groups()
+        campo_map = {"escanteios": "escanteios", "cartões": "cartoes", "faltas": "faltas", "chutes a gol": "chutes_gol"}
+        campo = campo_map[tipo]
+        por_time = resultado.get("por_time") or {}
+        valor = None
+        for nome_real, dados in por_time.items():
+            if _mesmo_time(nome_time, nome_real):
+                valor = (dados or {}).get(campo)
+                break
+        if valor is None:
+            return None  # sem dado desse time nesse jogo - fica pendente
+        linha = float(linha_txt.replace(",", "."))
+        return valor > linha if direcao == "mais" else valor < linha
 
     padroes_totais = [
         (r"mais de ([\d,]+) escanteios", "escanteios_total", ">"),
