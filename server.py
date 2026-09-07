@@ -312,7 +312,7 @@ def api_espn_multiplas():
     """
     data_str = request.args.get("data", date.today().isoformat())
     incluir_extras = request.args.get("escanteios_cartoes", "1") == "1"
-    incluir_jogadores = request.args.get("jogadores") == "1"  # desligado por padrão - resposta pesada
+    incluir_jogadores = request.args.get("jogadores", "1") == "1"  # ligado por padrão
     forcar_nova_busca = request.args.get("forcar") == "1"
 
     faixas = ["50%", "60%", "70%", "80%", "90%"]
