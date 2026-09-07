@@ -76,23 +76,41 @@ def _jogadores_relevantes(liga_codigo, time_id, min_jogos=5):
 
 
 def gerar_selecoes_jogadores(liga_codigo, liga_nome, jogo_nome, time_casa_id, time_fora_id, prob_minima=0.5, top_n=1):
-    """Gera seleções de 'mais/menos de 0,5 chutes a gol' e 'mais/menos de
-    X,5 faltas' pro(s) jogador(es) de maior média de cada time do jogo."""
+    """Gera seleções de chutes a gol e faltas dos jogadores em destaque de
+    cada time. Pega o LÍDER EM CHUTES e o LÍDER EM FALTAS separadamente -
+    normalmente são jogadores diferentes (atacante x volante), então pegar
+    só o líder geral deixaria o mercado de faltas de fora."""
     selecoes = []
     for time_id in (time_casa_id, time_fora_id):
         jogadores = _jogadores_relevantes(liga_codigo, time_id)
-        for jogador in jogadores[:top_n]:
-            probs_chutes = _poisson_over_under(jogador["chutes_gol_media"], [0.5])
-            probs_faltas = _poisson_over_under(jogador["faltas_media"], [1.5])
-            for nome_mercado, prob in {**probs_chutes, **probs_faltas}.items():
+        if not jogadores:
+            continue
+
+        lideres_chutes = sorted(jogadores, key=lambda j: j["chutes_gol_media"], reverse=True)[:top_n]
+        lideres_faltas = sorted(jogadores, key=lambda j: j["faltas_media"], reverse=True)[:top_n]
+
+        for jogador in lideres_chutes:
+            probs = _poisson_over_under(jogador["chutes_gol_media"], [0.5])
+            for nome_mercado, prob in probs.items():
                 prob = _limitar_prob(prob)
-                if prob < prob_minima:
-                    continue
-                sufixo = "chutes a gol" if nome_mercado in probs_chutes else "faltas"
-                selecoes.append({
-                    "jogo": jogo_nome,
-                    "mercado": f"{nome_mercado} {sufixo} ({jogador['nome']})",
-                    "prob_real": round(prob, 4),
-                    "liga": liga_nome,
-                })
+                if prob >= prob_minima:
+                    selecoes.append({
+                        "jogo": jogo_nome,
+                        "mercado": f"{jogador['nome']} {nome_mercado} chutes a gol",
+                        "prob_real": round(prob, 4),
+                        "liga": liga_nome,
+                    })
+
+        for jogador in lideres_faltas:
+            probs = _poisson_over_under(jogador["faltas_media"], [1.5])
+            for nome_mercado, prob in probs.items():
+                prob = _limitar_prob(prob)
+                if prob >= prob_minima:
+                    selecoes.append({
+                        "jogo": jogo_nome,
+                        "mercado": f"{jogador['nome']} {nome_mercado} faltas",
+                        "prob_real": round(prob, 4),
+                        "liga": liga_nome,
+                    })
+
     return selecoes
