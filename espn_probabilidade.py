@@ -208,6 +208,8 @@ def _stats_recentes_time(liga_codigo, time_id, ultimos_n=10):
     gols_marcados_casa, gols_sofridos_casa = [], []
     gols_marcados_fora, gols_sofridos_fora = [], []
     escanteios_lista, cartoes_lista, faltas_lista, chutes_gol_lista = [], [], [], []
+    escanteios_casa, cartoes_casa, faltas_casa, chutes_casa = [], [], [], []
+    escanteios_fora, cartoes_fora, faltas_fora, chutes_fora = [], [], [], []
 
     for ev in finalizados:
         comp = (ev.get("competitions") or [{}])[0]
@@ -239,14 +241,19 @@ def _stats_recentes_time(liga_codigo, time_id, ultimos_n=10):
         extras = _extrair_escanteios_cartoes(ev)
         dados_time = extras.get(str(time_id)) or extras.get(time_id)
         if dados_time:
-            if dados_time["escanteios"] is not None:
-                escanteios_lista.append(dados_time["escanteios"])
-            if dados_time["cartoes"] is not None:
-                cartoes_lista.append(dados_time["cartoes"])
-            if dados_time.get("faltas") is not None:
-                faltas_lista.append(dados_time["faltas"])
-            if dados_time.get("chutes_gol") is not None:
-                chutes_gol_lista.append(dados_time["chutes_gol"])
+            # guarda tanto a lista geral quanto a específica de casa/fora -
+            # um time costuma ter bem mais escanteios jogando em casa
+            # (pressiona mais) do que fora, então misturar tudo distorce
+            for campo, lista_geral, lista_casa, lista_fora in (
+                ("escanteios", escanteios_lista, escanteios_casa, escanteios_fora),
+                ("cartoes", cartoes_lista, cartoes_casa, cartoes_fora),
+                ("faltas", faltas_lista, faltas_casa, faltas_fora),
+                ("chutes_gol", chutes_gol_lista, chutes_casa, chutes_fora),
+            ):
+                valor = dados_time.get(campo)
+                if valor is not None:
+                    lista_geral.append(valor)
+                    (lista_casa if jogou_em_casa else lista_fora).append(valor)
 
     MINIMO_AMOSTRA_EXTRAS = 5  # menos que isso, não é confiável o bastante - usa o chute conservador
     MINIMO_AMOSTRA_MANDO = 3  # pra casa/fora específico - poucos jogos em casa/fora ainda dá pra usar geral
@@ -276,6 +283,16 @@ def _stats_recentes_time(liga_codigo, time_id, ultimos_n=10):
         "cartoes_media": _media_com_minimo(cartoes_lista, padrao["cartoes_media"]),
         "faltas_media": _media_com_minimo(faltas_lista, padrao["faltas_media"]),
         "chutes_gol_media": _media_com_minimo(chutes_gol_lista, padrao["chutes_gol_media"]),
+        # médias específicas de mando de campo - se não tiver amostra
+        # suficiente jogando em casa/fora, cai pra média geral do time
+        "escanteios_casa_media": _media_com_minimo(escanteios_casa, _media_com_minimo(escanteios_lista, padrao["escanteios_media"]), MINIMO_AMOSTRA_MANDO),
+        "escanteios_fora_media": _media_com_minimo(escanteios_fora, _media_com_minimo(escanteios_lista, padrao["escanteios_media"]), MINIMO_AMOSTRA_MANDO),
+        "cartoes_casa_media": _media_com_minimo(cartoes_casa, _media_com_minimo(cartoes_lista, padrao["cartoes_media"]), MINIMO_AMOSTRA_MANDO),
+        "cartoes_fora_media": _media_com_minimo(cartoes_fora, _media_com_minimo(cartoes_lista, padrao["cartoes_media"]), MINIMO_AMOSTRA_MANDO),
+        "faltas_casa_media": _media_com_minimo(faltas_casa, _media_com_minimo(faltas_lista, padrao["faltas_media"]), MINIMO_AMOSTRA_MANDO),
+        "faltas_fora_media": _media_com_minimo(faltas_fora, _media_com_minimo(faltas_lista, padrao["faltas_media"]), MINIMO_AMOSTRA_MANDO),
+        "chutes_casa_media": _media_com_minimo(chutes_casa, _media_com_minimo(chutes_gol_lista, padrao["chutes_gol_media"]), MINIMO_AMOSTRA_MANDO),
+        "chutes_fora_media": _media_com_minimo(chutes_fora, _media_com_minimo(chutes_gol_lista, padrao["chutes_gol_media"]), MINIMO_AMOSTRA_MANDO),
         "jogos_analisados": len(gols_marcados),
         "amostra_extras": {
             "escanteios": len(escanteios_lista), "cartoes": len(cartoes_lista),
@@ -385,10 +402,21 @@ def gerar_selecoes(data_str=None, prob_minima=0.5, incluir_escanteios_cartoes=Tr
 
             if incluir_escanteios_cartoes:
                 try:
-                    media_escanteios = stats_casa["escanteios_media"] + stats_fora["escanteios_media"]
-                    media_cartoes = stats_casa["cartoes_media"] + stats_fora["cartoes_media"]
-                    media_faltas = stats_casa["faltas_media"] + stats_fora["faltas_media"]
-                    media_chutes_gol = stats_casa["chutes_gol_media"] + stats_fora["chutes_gol_media"]
+                    # usa a média específica de mando: o time da casa com sua
+                    # média EM CASA, o visitante com a média DELE FORA
+                    esc_casa = stats_casa.get("escanteios_casa_media", stats_casa["escanteios_media"])
+                    esc_fora = stats_fora.get("escanteios_fora_media", stats_fora["escanteios_media"])
+                    car_casa = stats_casa.get("cartoes_casa_media", stats_casa["cartoes_media"])
+                    car_fora = stats_fora.get("cartoes_fora_media", stats_fora["cartoes_media"])
+                    fal_casa = stats_casa.get("faltas_casa_media", stats_casa["faltas_media"])
+                    fal_fora = stats_fora.get("faltas_fora_media", stats_fora["faltas_media"])
+                    chu_casa = stats_casa.get("chutes_casa_media", stats_casa["chutes_gol_media"])
+                    chu_fora = stats_fora.get("chutes_fora_media", stats_fora["chutes_gol_media"])
+
+                    media_escanteios = esc_casa + esc_fora
+                    media_cartoes = car_casa + car_fora
+                    media_faltas = fal_casa + fal_fora
+                    media_chutes_gol = chu_casa + chu_fora
 
                     probs_escanteios = _poisson_over_under(media_escanteios, [9.5])
                     probs_cartoes = _poisson_over_under(media_cartoes, [3.5])
@@ -405,6 +433,26 @@ def gerar_selecoes(data_str=None, prob_minima=0.5, incluir_escanteios_cartoes=Tr
                         for nome_mercado, prob in probs_grupo.items():
                             prob = _limitar_prob(prob)
                             rotulo = f"{nome_mercado} {sufixo}"
+                            if prob >= prob_minima:
+                                selecoes.append({"jogo": nome_jogo, "mercado": rotulo, "prob_real": round(prob, 4), "liga": liga_nome})
+
+                    # mercados POR TIME (ex: "Corinthians mais de 4,5 escanteios")
+                    # usando a média específica daquele time no mando dele
+                    mercados_por_time = [
+                        (jogo["nome_casa"], esc_casa, [4.5], "escanteios"),
+                        (jogo["nome_fora"], esc_fora, [4.5], "escanteios"),
+                        (jogo["nome_casa"], car_casa, [1.5], "cartões"),
+                        (jogo["nome_fora"], car_fora, [1.5], "cartões"),
+                        (jogo["nome_casa"], fal_casa, [10.5], "faltas"),
+                        (jogo["nome_fora"], fal_fora, [10.5], "faltas"),
+                        (jogo["nome_casa"], chu_casa, [3.5], "chutes a gol"),
+                        (jogo["nome_fora"], chu_fora, [3.5], "chutes a gol"),
+                    ]
+                    for nome_time, media_time, linhas, sufixo in mercados_por_time:
+                        probs_time = _poisson_over_under(media_time, linhas)
+                        for nome_mercado, prob in probs_time.items():
+                            prob = _limitar_prob(prob)
+                            rotulo = f"{nome_time} {nome_mercado} {sufixo}"
                             if prob >= prob_minima:
                                 selecoes.append({"jogo": nome_jogo, "mercado": rotulo, "prob_real": round(prob, 4), "liga": liga_nome})
                 except Exception as exc:
